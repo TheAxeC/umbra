@@ -1,0 +1,7 @@
+.DS_Store
+node_modules/
+dist/
+*.zip
+
+# working notes for Claude Code sessions, not part of the public repo
+CLAUDE.md

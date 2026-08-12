@@ -1,0 +1,245 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>umbra audio</title>
+<style>
+ body { margin:0; background:#111; color:#bbb; font:13px monospace; padding:16px; }
+ .ok { color:#7c7; } .bad { color:#e55; } h2 { font-size:14px; color:#888; margin:18px 0 6px; }
+ canvas { display:block; background:#000; margin:4px 0 10px; }
+</style>
+</head>
+<body>
+<h1 style="font-size:15px">umbra audio checks</h1>
+<div id="out"></div>
+<script type="module">
+// Checks for the synth, by rendering it and measuring the samples.
+//
+// Serve the repository and open http://localhost:8000/test/audio.html
+//
+// Audio is the easiest part of a game to ship broken, because nothing throws
+// when a sound is inaudible. The footstep in this game shipped at a peak of
+// 0.007, which is silence, and the code looked entirely reasonable: a noise
+// burst through a lowpass at a sensible gain. A 480 Hz lowpass simply discards
+// almost all the energy in white noise. Only rendering it and looking at the
+// numbers found that.
+//
+// OfflineAudioContext renders faster than real time into a buffer, needs no
+// speakers, and needs no user gesture, which also makes this work in a
+// backgrounded tab. The trick that makes it possible to test the game's own
+// audio code is in render() below: window.AudioContext is temporarily replaced
+// with a constructor that hands back the offline context, so initAudio builds
+// its graph there without knowing the difference.
+const src = await (await fetch("../index.html")).text();
+const block = src.slice(src.indexOf("const MAP_SIZE"), src.indexOf("// Shader. Fullscreen triangle"));
+const EXPORTS = `
+return { initAudio, playStep, camera, BPM, STEPS, BARS, settings,
+  sfxShoot, sfxImpHit, sfxImpDie, sfxGrowl, sfxSwing, sfxHurt, sfxDie, sfxClear,
+  sfxStep, sfxCast, sfxExplode, sfxPickup, sfxDoor, sfxLocked, sfxSwitch, sfxDryFire,
+  getAudio: () => audio };`;
+
+const out = document.getElementById("out");
+let failures = 0;
+function line(ok, text) {
+  const d = document.createElement("div");
+  d.className = ok ? "ok" : "bad";
+  d.textContent = (ok ? "  ok   " : "  FAIL ") + text;
+  out.append(d);
+  if (!ok) failures++;
+  console.log((ok ? "ok   " : "FAIL ") + text);
+}
+function head(t) {
+  const h = document.createElement("h2");
+  h.textContent = t;
+  out.append(h);
+}
+
+const RATE = 44100;
+
+// A fresh copy of the game's scope per case.
+//
+// initAudio is a no-op once a context exists, and `audio` is a module-level
+// binding with no setter, so there is no way to reset it from outside. Rather
+// than add a test hook to the game, re-evaluate the whole block, which is a
+// string operation costing a fraction of a millisecond. Each case therefore
+// starts from an uninitialised audio layer.
+function freshGame() {
+  return new Function(block + EXPORTS)();
+}
+
+// Renders one case and returns the samples with peak and RMS.
+//
+// The substitution has to be a plain function, not an arrow: initAudio calls
+// `new Ctx()`, and an arrow function cannot be constructed. A constructor that
+// returns an object hands back that object instead of `this`, which is how the
+// offline context reaches the game unchanged. The original is restored in a
+// finally block so a throw inside a case cannot leave the page's AudioContext
+// permanently replaced.
+//
+// Stereo, because the positional checks need two channels to compare.
+async function render(seconds, play) {
+  const game = freshGame();
+  const offline = new OfflineAudioContext(2, Math.ceil(RATE * seconds), RATE);
+  const real = window.AudioContext;
+  window.AudioContext = function () { return offline; };
+  try {
+    game.initAudio();
+    play(game);
+  } finally {
+    window.AudioContext = real;
+  }
+  const buf = await offline.startRendering();
+  const L = buf.getChannelData(0), R = buf.getChannelData(1);
+  let peak = 0, sum = 0;
+  for (let i = 0; i < L.length; i++) {
+    const l = Math.abs(L[i]), r = Math.abs(R[i]);
+    peak = Math.max(peak, l, r);
+    sum += L[i] * L[i] + R[i] * R[i];
+  }
+  return { buf, L, R, peak, rms: Math.sqrt(sum / (L.length * 2)) };
+}
+
+// Peak envelope of the left channel, one column per pixel. Numbers catch
+// silence and clipping; the drawing catches an envelope with the wrong shape,
+// such as a decay that never ends or an attack that clicks.
+function draw(res, label) {
+  const c = document.createElement("canvas");
+  c.width = 700; c.height = 60;
+  const g = c.getContext("2d");
+  g.fillStyle = "#5c8";
+  const step = Math.floor(res.L.length / c.width);
+  for (let x = 0; x < c.width; x++) {
+    let m = 0;
+    for (let i = 0; i < step; i++) m = Math.max(m, Math.abs(res.L[x * step + i] || 0));
+    g.fillRect(x, 30 - m * 29, 1, Math.max(1, m * 58));
+  }
+  const cap = document.createElement("div");
+  cap.textContent = label;
+  out.append(cap, c);
+}
+
+// Every effect gets two checks: loud enough to hear at all, and inside the
+// rails. The audible threshold is low, at 0.02, because these are
+// asserting that a sound exists rather than that it is mixed well. Relative
+// levels are a judgement call and are left to the ear.
+head("effects make sound");
+const EFFECTS = [
+  ["pistol", (g) => g.sfxShoot(0), 0.4],
+  ["shotgun", (g) => g.sfxShoot(1), 0.6],
+  ["chaingun", (g) => g.sfxShoot(2), 0.3],
+  ["dry fire", (g) => g.sfxDryFire(), 0.2],
+  ["weapon switch", (g) => g.sfxSwitch(), 0.3],
+  ["caster winding up", (g) => g.sfxCast(g.camera.x + 2, g.camera.y), 0.6],
+  ["fireball burst", (g) => g.sfxExplode(g.camera.x + 2, g.camera.y), 0.8],
+  ["pickup", (g) => g.sfxPickup(false), 0.5],
+  ["weapon pickup", (g) => g.sfxPickup(true), 0.6],
+  ["door", (g) => g.sfxDoor(g.camera.x + 2, g.camera.y), 1.0],
+  ["locked door", (g) => g.sfxLocked(), 0.4],
+  ["imp hit", (g) => g.sfxImpHit(g.camera.x + 2, g.camera.y), 0.4],
+  ["imp death", (g) => g.sfxImpDie(g.camera.x + 2, g.camera.y), 1.0],
+  ["growl", (g) => g.sfxGrowl(g.camera.x + 2, g.camera.y), 1.0],
+  ["swing", (g) => g.sfxSwing(g.camera.x + 1, g.camera.y), 0.5],
+  ["player hurt", (g) => g.sfxHurt(), 0.6],
+  ["player death", (g) => g.sfxDie(), 2.0],
+  ["level clear", (g) => g.sfxClear(), 1.2],
+  ["footstep", (g) => g.sfxStep(), 0.3],
+];
+for (const [name, play, secs] of EFFECTS) {
+  const res = await render(secs, play);
+  line(res.peak > 0.02, name + " is audible (peak " + res.peak.toFixed(3) + ")");
+  line(res.peak <= 1.0, name + " does not clip (peak " + res.peak.toFixed(3) + ")");
+  draw(res, name);
+}
+
+// Enemy sounds are panned and attenuated by position. Growling is the only
+// warning about an enemy approaching from outside the field of view, so getting
+// the side wrong is a gameplay bug, not a cosmetic one. Checked by rendering the
+// same sound from the left and from the right and comparing channel energy.
+head("sounds are placed in the world");
+{
+  const left = await render(0.5, (g) => g.sfxImpHit(g.camera.x, g.camera.y - 3));
+  const right = await render(0.5, (g) => g.sfxImpHit(g.camera.x, g.camera.y + 3));
+  const energy = (res, ch) => {
+    let s = 0;
+    for (let i = 0; i < ch.length; i++) s += ch[i] * ch[i];
+    return Math.sqrt(s / ch.length);
+  };
+  const lL = energy(left, left.L), lR = energy(left, left.R);
+  const rL = energy(right, right.L), rR = energy(right, right.R);
+  line(lL > lR * 1.3, "an imp on the left is louder on the left (" +
+       lL.toFixed(4) + " vs " + lR.toFixed(4) + ")");
+  line(rR > rL * 1.3, "an imp on the right is louder on the right (" +
+       rR.toFixed(4) + " vs " + rL.toFixed(4) + ")");
+
+  const near = await render(0.5, (g) => g.sfxImpHit(g.camera.x + 1, g.camera.y));
+  const far = await render(0.5, (g) => g.sfxImpHit(g.camera.x + 14, g.camera.y));
+  line(near.peak > far.peak * 3, "distance makes an imp quieter (" +
+       near.peak.toFixed(4) + " near vs " + far.peak.toFixed(4) + " far)");
+  line(far.peak > 0.0005, "but a far imp is still there to hear (" + far.peak.toFixed(5) + ")");
+}
+
+// The sequencer is driven directly here rather than through its setInterval
+// scheduler, since an offline context has no wall clock to schedule against.
+// Four bars covers the transposition table turning over and the lead entering
+// on the odd bars.
+head("the song plays");
+for (const [name, firstBar] of [["section A", 0], ["section B", 8]]) {
+  const spacing = 60 / 150 / 4;
+  const bars = 4;
+  const secs = spacing * 16 * bars + 0.5;
+  const res = await render(secs, (g) => {
+    for (let i = 0; i < 16 * bars; i++) g.playStep(firstBar * 16 + i, i * spacing);
+  });
+  line(res.peak > 0.05, name + ": four bars are audible (peak " + res.peak.toFixed(3) + ")");
+  line(res.peak <= 1.0, name + ": does not clip (peak " + res.peak.toFixed(3) + ")");
+  line(res.rms > 0.01, name + ": steady level through the loop (rms " + res.rms.toFixed(4) + ")");
+  draw(res, name + ", four bars");
+
+  // Onsets per bar. Counting the share of sixteenths that carry a note would
+  // only measure whether the groove is straight eighths, which is a taste
+  // question; a silent or nearly empty bar is the actual failure.
+  const win = Math.floor(spacing * RATE);
+  const perBar = [];
+  let offbeat = 0;
+  for (let b = 0; b < bars; b++) {
+    let hits = 0;
+    for (let s = 0; s < 16; s++) {
+      const at = (b * 16 + s) * win;
+      let m = 0;
+      for (let i = 0; i < win; i++) m = Math.max(m, Math.abs(res.L[at + i] || 0));
+      if (m > 0.03) { hits++; if (s % 2 === 1) offbeat++; }
+    }
+    perBar.push(hits);
+  }
+  line(perBar.every((n) => n >= 5), name + ": every bar carries notes (" + perBar.join(", ") + ")");
+  line(offbeat > 0, name + ": " + offbeat + " onsets fall off the eighth");
+
+  // A bar of silence would mean the sequencer stalled after the first loop.
+  const half = Math.floor(res.L.length / 2);
+  let tail = 0;
+  for (let i = half; i < res.L.length; i++) tail = Math.max(tail, Math.abs(res.L[i]));
+  line(tail > 0.05, name + ": the second half is still playing (peak " + tail.toFixed(3) + ")");
+}
+
+// Everything at once. Individually quiet sounds can still sum past 1.0 when a
+// shot, a death and the song land on the same sample.
+head("mixed together");
+{
+  const spacing = 60 / 150 / 4;
+  const res = await render(2.2, (g) => {
+    for (let i = 0; i < 32; i++) g.playStep(128 + i, i * spacing);
+    g.sfxShoot(1);
+    g.sfxImpDie(g.camera.x + 3, g.camera.y + 1);
+    g.sfxHurt();
+  });
+  line(res.peak <= 1.0, "music plus effects stays inside the rails (peak " +
+       res.peak.toFixed(3) + ")");
+  draw(res, "song plus gunfire");
+}
+
+const done = document.createElement("h2");
+done.textContent = failures === 0 ? "all audio checks passed" : failures + " FAILED";
+done.style.color = failures === 0 ? "#7c7" : "#e55";
+out.append(done);
+console.log(failures === 0 ? "all audio checks passed" : failures + " audio checks FAILED");
+</script>
+</body>
+</html>

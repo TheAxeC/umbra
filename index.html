@@ -1,0 +1,3472 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>umbra</title>
+<style>
+  /* Kept spare on purpose. After packing, the stylesheet is the single
+     largest non game item in the artifact, so this groups every shared
+     declaration and leaves out anything the browser already does. */
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden;
+               font: 14px/1.4 ui-monospace, Menlo, monospace; color: #c9c5d2 }
+  canvas { display: block; width: 100%; height: 100%; cursor: crosshair }
+  .off { display: none !important }
+  b, i, u { font-weight: 400; font-style: normal; text-decoration: none }
+  #err { position: fixed; inset: 0; color: #d66; padding: 2em; white-space: pre-wrap }
+
+  .panel, #hud, #hint, #note { position: fixed; left: 0; right: 0 }
+  .panel { top: 0; bottom: 0; display: flex; flex-direction: column;
+           align-items: center; justify-content: center; gap: 18px;
+           background: rgba(4,3,7,.88) }
+  h1, h2 { margin: 0; color: #e8503a; font-weight: 400 }
+  h1 { font-size: 68px; letter-spacing: 22px; text-indent: 22px }
+  h1 + p { margin: -14px 0 10px; letter-spacing: 6px; font-size: 12px }
+  h2 { font-size: 20px; letter-spacing: 8px }
+  #over h2 { font-size: 40px }
+  .btn { min-width: 260px; padding: 11px 20px; letter-spacing: 5px; cursor: pointer;
+         border: 1px solid #35313f; user-select: none }
+  .btn:hover { border-color: #e8503a; color: #fff }
+  .btn, .foot, #hint, #note, .cell, #over, h1 + p { text-align: center }
+  .foot, .cell i, #hint, h1 + p { color: #6f6b7d; font-size: 11px; letter-spacing: 3px }
+
+  .row { display: grid; grid-template-columns: 150px 210px 66px; align-items: center;
+         gap: 12px; letter-spacing: 3px; font-size: 12px }
+  .row input { width: 100%; accent-color: #e8503a }
+  .row span:last-child { text-align: right }
+
+  #hud { bottom: 0; height: 78px; display: flex; background: #12101a;
+         border-top: 2px solid #3b3547 }
+  #hud, #hint, #note, #over { pointer-events: none }
+  .cell { display: flex; flex-direction: column; align-items: center; justify-content: center;
+          padding: 0 11px; border-right: 1px solid #241f2e; min-width: 58px }
+  .cell b { font-size: 26px; color: #e8503a; line-height: 1 }
+  .cell i { margin-top: 5px; font-size: 9px }
+  .cell.wide { flex: 1; min-width: 0 }
+  #armour b { color: #4f8fd6 }
+  #stamBar i { background: #4f8fd6 }
+
+  #face { width: 46px; height: 50px; position: relative; background: #6b4a3a;
+          border: 2px solid #23202c }
+  #face span { position: absolute }
+  #face .eye { top: 15px; width: 8px; height: 8px; background: #efe7dd }
+  #face .l { left: 8px } #face .r { right: 8px }
+  #face .eye b { top: 2px; left: 2px; width: 4px; height: 4px; background: #171219; display: block }
+  #face .mouth { left: 11px; right: 11px; bottom: 9px; height: 4px; background: #2a1b18 }
+  #face .brow { left: 6px; right: 6px; top: 9px; height: 3px; background: #40291f }
+
+  #slots { display: flex; gap: 7px }
+  #slots div { display: flex; flex-direction: column; align-items: center; gap: 3px;
+               padding: 4px 10px; border: 1px solid #2f2a3a; font-size: 9px;
+               letter-spacing: 1px; color: #8b8699; white-space: nowrap }
+  #slots u { font-size: 15px; line-height: 1; color: #cbc6d6 }
+  #slots .dim { opacity: .22 }
+  #slots .on { border-color: #e8503a; color: #fff }
+  #keys { display: flex; gap: 5px }
+  #keys i, #stamBar { border: 1px solid #2f2a3a; display: block }
+  #keys i { width: 12px; height: 17px; opacity: .16 }
+  #keys .have { opacity: 1 }
+  #kr { background: #c2402f } #kb { background: #3f6bc4 }
+  #stamBar { width: 44px; height: 8px }
+  #stamBar i { height: 100%; width: 100%; display: block }
+
+  #hint { bottom: 96px; letter-spacing: 4px }
+  #note { top: 16%; color: #d8d4e2; letter-spacing: 6px }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud" class="off">
+  <div class="cell"><b id="hp">100</b><i>HEALTH</i></div>
+  <div class="cell" id="armour"><b id="arm">0</b><i>ARMOUR</i></div>
+  <div class="cell"><span id="stamBar"><i id="stam"></i></span><i>STAMINA</i></div>
+  <div class="cell">
+    <div id="face"><span class="brow"></span><span class="eye l"><b></b></span><span class="eye r"><b></b></span><span class="mouth"></span></div>
+  </div>
+  <div class="cell"><b id="ammo">--</b><i id="ammoName">BULLETS</i></div>
+  <div class="cell"><b id="kills">0/0</b><i>KILLS</i></div>
+  <div class="cell"><b id="lvl">1</b><i>LEVEL</i></div>
+  <div class="cell"><span id="keys"><i id="kr"></i><i id="kb"></i></span><i>KEYS</i></div>
+  <div class="cell wide">
+    <div id="slots"></div>
+    <i>ARMS</i>
+  </div>
+</div>
+<div id="note" class="off"></div>
+<div id="hint" class="off">WASD MOVE &middot; MOUSE LOOK &middot; CLICK FIRE &middot; 1-3 WEAPONS &middot; E DOORS &middot; ESC PAUSE</div>
+
+<div id="menu" class="panel">
+  <h1>UMBRA</h1>
+  <p>A DOOM SHAPED SHOOTER IN 14 KILOBYTES</p>
+  <div class="btn" id="play">PLAY</div>
+  <div class="btn" id="toSettings">SETTINGS</div>
+  <div class="foot" id="best"></div>
+  <div class="foot">WASD MOVE &middot; MOUSE LOOK &middot; CLICK FIRE &middot; SHIFT RUN<br>1-3 WEAPONS &middot; E OPENS DOORS &middot; M MUTES &middot; ESC PAUSES</div>
+</div>
+
+<div id="settingsPanel" class="panel off">
+  <h2>SETTINGS</h2>
+  <div id="rows"></div>
+  <div class="btn" id="backFromSettings">BACK</div>
+</div>
+
+<div id="pause" class="panel off">
+  <h2>PAUSED</h2>
+  <div class="btn" id="resume">RESUME</div>
+  <div class="btn" id="pauseSettings">SETTINGS</div>
+  <div class="btn" id="quit">ABANDON RUN</div>
+</div>
+
+<div id="over" class="panel off">
+  <h2 id="msg">YOU DIED</h2>
+  <div class="foot" id="sub">CLICK TO TRY AGAIN</div>
+</div>
+
+<script type="module">
+
+// ---------------------------------------------------------------------------
+// The map. One representation of the world: 32 rows of 32 cells, one bit per
+// cell, 1 = solid. The shader reads these same 32 words, and later the JS
+// collision code will read them too.
+// ---------------------------------------------------------------------------
+
+const MAP_SIZE = 64;
+const MAP_WORDS = MAP_SIZE * 2;              // two 32 bit words per row
+
+// Three bit planes over the same grid, uploaded to the shader as they are.
+//
+//   SOLID   the cell stops you walking into it
+//   LOW     waist high block: stops movement, but not sight or bullets, so it
+//           is cover you can shoot over and enemies can shoot you over
+//   DOORBIT the cell is a door, and how far it has slid open lives in doors[]
+//
+// A cell with SOLID and neither modifier is an ordinary full height wall.
+const SOLID = new Uint32Array(MAP_WORDS);
+const LOW = new Uint32Array(MAP_WORDS);
+const DOORBIT = new Uint32Array(MAP_WORDS);
+
+// Floor height, two bits per cell across two planes, giving four levels a
+// quarter of a wall apart. This is what makes stairs and raised areas possible:
+// a cell is not just open or shut, it is open at a height.
+const HGT0 = new Uint32Array(MAP_WORDS);
+const HGT1 = new Uint32Array(MAP_WORDS);
+const STEP = 0.25;          // one step, in wall heights
+const CLIMB = 0.28;         // the tallest step anything can walk up
+
+function heightAt(cx, cy) {
+  if (cx < 0 || cy < 0 || cx >= MAP_SIZE || cy >= MAP_SIZE) return 0;
+  return ((bitAt(HGT0, cx, cy) ? 1 : 0) + (bitAt(HGT1, cx, cy) ? 2 : 0)) * STEP;
+}
+
+function setHeight(cx, cy, level) {
+  if (level & 1) setBit(HGT0, cx, cy); else clearBit(HGT0, cx, cy);
+  if (level & 2) setBit(HGT1, cx, cy); else clearBit(HGT1, cx, cy);
+}
+
+function bitAt(plane, cx, cy) {
+  return ((plane[cy * 2 + (cx >> 5)] >>> (cx & 31)) & 1) !== 0;
+}
+
+function setBit(plane, cx, cy) {
+  plane[cy * 2 + (cx >> 5)] |= (1 << (cx & 31));
+}
+
+function clearBit(plane, cx, cy) {
+  plane[cy * 2 + (cx >> 5)] &= ~(1 << (cx & 31));
+}
+
+// Blocks movement. The shader's solid() reads the same words.
+function solidAt(cx, cy) {
+  if (cx < 0 || cy < 0 || cx >= MAP_SIZE || cy >= MAP_SIZE) return true;
+  return bitAt(SOLID, cx, cy);
+}
+
+// Blocks sight and bullets. Waist high blocks are transparent to
+// both, which is the whole point of them.
+function opaqueAt(cx, cy) {
+  if (cx < 0 || cy < 0 || cx >= MAP_SIZE || cy >= MAP_SIZE) return true;
+  return bitAt(SOLID, cx, cy) && !bitAt(LOW, cx, cy);
+}
+
+function carve(cx, cy) {
+  clearBit(SOLID, cx, cy);
+  clearBit(LOW, cx, cy);
+  clearBit(DOORBIT, cx, cy);
+}
+
+// Can something standing on `from` step onto the cell at (cx, cy)? A drop of
+// any size is allowed, a rise only up to one step.
+function canStep(fromZ, cx, cy) {
+  return heightAt(cx, cy) - fromZ <= CLIMB;
+}
+
+// ---------------------------------------------------------------------------
+// Level generation.
+//
+// Two layouts, alternating by level so the game does not look the same twice in
+// a row: rectangular rooms joined by corridors, and caves grown by cellular
+// automata. Both then go through the same passes that turn a carved shape into
+// a level: pick chokepoints and hang doors in them, scatter waist high cover,
+// and work out where the player, the enemies and the pickups stand.
+//
+// Everything comes from the seed, so a level can always be rebuilt exactly.
+// ---------------------------------------------------------------------------
+
+const ROOMS = 11;
+const ROOM_MIN = 5, ROOM_MAX = 12;
+const MAX_DOORS = 5;
+
+let rand = () => 0;
+
+function seedRng(seed) {
+  let s = seed >>> 0;
+  rand = () => {
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
+function randInt(n) {
+  return Math.floor(rand() * n);
+}
+
+function corridorX(x0, x1, y) {
+  for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) carve(x, y);
+}
+
+function corridorY(y0, y1, x) {
+  for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) carve(x, y);
+}
+
+// --- layout one: rooms and corridors ---------------------------------------
+
+function carveRooms() {
+  const rooms = [];
+  for (let tries = 0; tries < 400 && rooms.length < ROOMS; tries++) {
+    const w = ROOM_MIN + randInt(ROOM_MAX - ROOM_MIN);
+    const h = ROOM_MIN + randInt(ROOM_MAX - ROOM_MIN);
+    const x = 1 + randInt(MAP_SIZE - 2 - w);
+    const y = 1 + randInt(MAP_SIZE - 2 - h);
+    // Leave a wall between rooms so they read as separate spaces.
+    const clash = rooms.some((r) =>
+      x < r.x + r.w + 1 && x + w + 1 > r.x && y < r.y + r.h + 1 && y + h + 1 > r.y);
+    if (clash) continue;
+    rooms.push({ x, y, w, h, cx: x + (w >> 1), cy: y + (h >> 1) });
+  }
+
+  for (const r of rooms) {
+    for (let y = r.y; y < r.y + r.h; y++) {
+      for (let x = r.x; x < r.x + r.w; x++) carve(x, y);
+    }
+  }
+
+  const link = (a, b) => {
+    if (rand() < 0.5) {
+      corridorX(a.cx, b.cx, a.cy);
+      corridorY(a.cy, b.cy, b.cx);
+    } else {
+      corridorY(a.cy, b.cy, a.cx);
+      corridorX(a.cx, b.cx, b.cy);
+    }
+  };
+  for (let i = 1; i < rooms.length; i++) link(rooms[i - 1], rooms[i]);
+  // Extra links turn the layout from a tree into a graph, which means loops,
+  // alternative routes, and being approached from two directions at once.
+  for (let i = 0; i < 3; i++) link(rooms[randInt(rooms.length)], rooms[randInt(rooms.length)]);
+
+  return rooms.map((r) => ({ x: r.cx + 0.5, y: r.cy + 0.5 }));
+}
+
+// --- layout two: caves ------------------------------------------------------
+
+// Cellular automata. Fill at random, then repeatedly set each cell to whatever
+// most of its neighbours are, which pulls the noise into blobs with smooth
+// edges. Five passes is enough to lose the speckle without dissolving detail.
+function carveCaves() {
+  // The smoothing rule below turns a cell into a wall when five of its eight
+  // neighbours are walls, which erodes walls whenever they start in a minority.
+  // Seeding slightly over half solid is what keeps the result a cave system
+  // rather than one large cavern.
+  for (let y = 2; y < MAP_SIZE - 2; y++) {
+    for (let x = 2; x < MAP_SIZE - 2; x++) {
+      if (rand() > 0.58) carve(x, y);
+    }
+  }
+
+  for (let pass = 0; pass < 5; pass++) {
+    const next = Uint32Array.from(SOLID);
+    for (let y = 2; y < MAP_SIZE - 2; y++) {
+      for (let x = 2; x < MAP_SIZE - 2; x++) {
+        let walls = 0;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if ((dx || dy) && solidAt(x + dx, y + dy)) walls++;
+          }
+        }
+        if (walls > 4) next[y * 2 + (x >> 5)] |= (1 << (x & 31));
+        else next[y * 2 + (x >> 5)] &= ~(1 << (x & 31));
+      }
+    }
+    SOLID.set(next);
+  }
+
+  // Automata leave disconnected pockets. Keep the largest region and fill the
+  // rest in, which guarantees the level is one connected space.
+  const region = regionFrom(largestOpenCell());
+  for (let y = 0; y < MAP_SIZE; y++) {
+    for (let x = 0; x < MAP_SIZE; x++) {
+      if (!solidAt(x, y) && !region.has(y * MAP_SIZE + x)) setBit(SOLID, x, y);
+    }
+  }
+
+  // A seed this solid sometimes shatters into pockets and the biggest survivor
+  // is too small to be a level. Rather than ship a cupboard, fall back.
+  if (region.size < 420) return null;
+
+  // Spread candidate positions out over the surviving cave.
+  const cells = [...region].map((i) => ({ x: (i % MAP_SIZE) + 0.5, y: Math.floor(i / MAP_SIZE) + 0.5 }));
+  const spots = [];
+  for (let i = 0; i < 14 && cells.length; i++) {
+    const pick = cells[randInt(cells.length)];
+    if (spots.every((s) => Math.hypot(s.x - pick.x, s.y - pick.y) > 9)) spots.push(pick);
+    else i--;
+    if (spots.length > 11) break;
+  }
+  return spots.length ? spots : cells.slice(0, 8);
+}
+
+// Flood fill of open cells, as a set of y * MAP_SIZE + x.
+function regionFrom(startIndex) {
+  const seen = new Set();
+  if (startIndex < 0) return seen;
+  const stack = [startIndex];
+  seen.add(startIndex);
+  while (stack.length) {
+    const i = stack.pop();
+    const x = i % MAP_SIZE, y = Math.floor(i / MAP_SIZE);
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy;
+      const ni = ny * MAP_SIZE + nx;
+      if (solidAt(nx, ny) || seen.has(ni)) continue;
+      seen.add(ni);
+      stack.push(ni);
+    }
+  }
+  return seen;
+}
+
+function largestOpenCell() {
+  let best = -1, bestSize = 0;
+  const visited = new Set();
+  for (let y = 1; y < MAP_SIZE - 1; y++) {
+    for (let x = 1; x < MAP_SIZE - 1; x++) {
+      const i = y * MAP_SIZE + x;
+      if (solidAt(x, y) || visited.has(i)) continue;
+      const region = regionFrom(i);
+      for (const c of region) visited.add(c);
+      if (region.size > bestSize) { bestSize = region.size; best = i; }
+    }
+  }
+  return best;
+}
+
+// --- shared passes ----------------------------------------------------------
+
+// A chokepoint is an open cell with exactly two opposite open neighbours: a
+// gap one cell wide, which is where a door belongs in either layout.
+function chokepoints() {
+  const out = [];
+  for (let y = 1; y < MAP_SIZE - 1; y++) {
+    for (let x = 1; x < MAP_SIZE - 1; x++) {
+      if (solidAt(x, y)) continue;
+      const l = solidAt(x - 1, y), r = solidAt(x + 1, y);
+      const u = solidAt(x, y - 1), d = solidAt(x, y + 1);
+      if ((!l && !r && u && d) || (!u && !d && l && r)) out.push({ x, y });
+    }
+  }
+  return out;
+}
+
+// Cover: short runs of waist high blocks in open floor, away from the walls, so
+// there is something to break sight lines and duck behind.
+// Cover: short runs of waist high blocks in open floor, so there is something
+// to break sight lines and duck behind.
+//
+// Placement is verified rather than guessed. Counting solid neighbours is not
+// enough: a run of three can bridge a corridor from a cell that looked open,
+// which seals off part of the level and can strand an enemy or a key where the
+// player can never reach it. So each run is placed, the level is flood filled,
+// and the run is taken back out if anything stopped being reachable.
+function scatterCover(count, open) {
+  if (!open.length) return;
+  for (let i = 0; i < count; i++) {
+    const seed = open[randInt(open.length)];
+    const x = seed % MAP_SIZE, y = Math.floor(seed / MAP_SIZE);
+    const run = 1 + randInt(3);
+    const horiz = rand() < 0.5;
+    const placed = [];
+    for (let k = 0; k < run; k++) {
+      const cx = x + (horiz ? k : 0), cy = y + (horiz ? 0 : k);
+      if (cx >= MAP_SIZE - 2 || cy >= MAP_SIZE - 2) break;
+      if (solidAt(cx, cy)) break;
+      // Open floor only. Allowing one solid neighbour let a run plug a two
+      // wide alley: every cell in one has a neighbour, and the connectivity
+      // check still passes because another route exists, so the alley just
+      // becomes a dead end for no reason.
+      let neighbours = 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        if (solidAt(cx + dx, cy + dy)) neighbours++;
+      }
+      if (neighbours > 0 || heightAt(cx, cy) > 0) break;
+      // Never on top of where the player will be standing, and never on a
+      // pickup that has already been placed, which would bury the key.
+      if (Math.hypot(cx + 0.5 - START[0], cy + 0.5 - START[1]) < 2) break;
+      if (pickups.some((p) => Math.floor(p.x) === cx && Math.floor(p.y) === cy)) break;
+      setBit(SOLID, cx, cy);
+      setBit(LOW, cx, cy);
+      placed.push([cx, cy]);
+    }
+    if (placed.length && !connected(open)) {
+      for (const [cx, cy] of placed) {
+        clearBit(SOLID, cx, cy);
+        clearBit(LOW, cx, cy);
+      }
+    }
+  }
+}
+
+// Is every cell that is still open reachable from the first one? Doors count as
+// passable, since a door is a delay rather than a wall.
+function connected(open) {
+  let first = -1;
+  for (const i of open) {
+    if (!solidAt(i % MAP_SIZE, Math.floor(i / MAP_SIZE))) { first = i; break; }
+  }
+  if (first < 0) return true;
+  const seen = new Set([first]);
+  const stack = [first];
+  while (stack.length) {
+    const i = stack.pop();
+    const x = i % MAP_SIZE, y = Math.floor(i / MAP_SIZE);
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy, ni = ny * MAP_SIZE + nx;
+      if (nx < 0 || ny < 0 || nx >= MAP_SIZE || ny >= MAP_SIZE || seen.has(ni)) continue;
+      if (solidAt(nx, ny) && !bitAt(DOORBIT, nx, ny)) continue;
+      seen.add(ni);
+      stack.push(ni);
+    }
+  }
+  for (const i of open) {
+    if (solidAt(i % MAP_SIZE, Math.floor(i / MAP_SIZE))) continue;   // now cover
+    if (!seen.has(i)) return false;
+  }
+  return true;
+}
+
+// Every open cell, as flat indices, for the passes that need somewhere to put
+// something rather than a coordinate to test.
+function openCells() {
+  const out = [];
+  for (let y = 1; y < MAP_SIZE - 1; y++) {
+    for (let x = 1; x < MAP_SIZE - 1; x++) {
+      if (!solidAt(x, y)) out.push(y * MAP_SIZE + x);
+    }
+  }
+  return out;
+}
+
+// Raised ground. A platform is a rectangle lifted one or two steps, with a
+// staircase running off one edge so it can be walked up. Everything checks
+// canStep as it goes, so a platform can never be built that cannot be reached.
+function raiseGround(open, count) {
+  for (let i = 0; i < count; i++) {
+    const seed = open[randInt(open.length)];
+    const px = seed % MAP_SIZE, py = Math.floor(seed / MAP_SIZE);
+    const w = 3 + randInt(5), h = 3 + randInt(5);
+    const level = 1 + randInt(2);
+
+    // Only on ground that is flat, open and entirely at height zero.
+    let ok = true;
+    for (let y = py - 1; y <= py + h && ok; y++) {
+      for (let x = px - 1; x <= px + w && ok; x++) {
+        if (x < 1 || y < 1 || x >= MAP_SIZE - 1 || y >= MAP_SIZE - 1) ok = false;
+        else if (solidAt(x, y) || heightAt(x, y) > 0) ok = false;
+      }
+    }
+    if (!ok) continue;
+
+    for (let y = py; y < py + h; y++) {
+      for (let x = px; x < px + w; x++) setHeight(x, y, level);
+    }
+
+    // A staircase down one side, one step per cell, so the top is reachable.
+    const side = randInt(4);
+    for (let k = 1; k <= level; k++) {
+      const step = level - k;
+      for (let n = 0; n < (side < 2 ? h : w); n++) {
+        const x = side === 0 ? px - k : side === 1 ? px + w - 1 + k : px + n;
+        const y = side === 2 ? py - k : side === 3 ? py + h - 1 + k : py + n;
+        if (x < 1 || y < 1 || x >= MAP_SIZE - 1 || y >= MAP_SIZE - 1) continue;
+        if (solidAt(x, y) || heightAt(x, y) > 0) continue;
+        setHeight(x, y, step);
+      }
+    }
+  }
+}
+
+function generate(seed) {
+  seedRng(seed);
+  SOLID.fill(0xffffffff);
+  LOW.fill(0);
+  DOORBIT.fill(0);
+  HGT0.fill(0);
+  HGT1.fill(0);
+  if (seed & 1) return carveRooms();
+  const caves = carveCaves();
+  if (caves) return caves;
+  // The cave collapsed. Start again from the same seed as a rooms level, which
+  // keeps generation deterministic.
+  seedRng(seed);
+  SOLID.fill(0xffffffff);
+  LOW.fill(0);
+  DOORBIT.fill(0);
+  return carveRooms();
+}
+
+// The player is a square of half-width RADIUS, so a cell is walkable only if
+// all four corners land in empty space.
+const RADIUS = 0.22;
+
+const EPS = 1e-4;
+
+// Where the body comes to rest when a step is refused: flush against the cell
+// boundary it was heading for, rather than dropping the step and leaving a gap.
+// Safe because a single step is always shorter than a cell.
+function axisStop(pos, delta) {
+  return delta > 0 ? Math.floor(pos + RADIUS) + 1 - RADIUS - EPS
+                   : Math.floor(pos - RADIUS) + RADIUS + EPS;
+}
+
+function fits(x, y, r = RADIUS, fromZ = null) {
+  const x0 = Math.floor(x - r), x1 = Math.floor(x + r);
+  const y0 = Math.floor(y - r), y1 = Math.floor(y + r);
+  if (solidAt(x0, y0) || solidAt(x1, y0) || solidAt(x0, y1) || solidAt(x1, y1)) return false;
+  // A step too tall is as good as a wall.
+  if (fromZ === null) return true;
+  return canStep(fromZ, x0, y0) && canStep(fromZ, x1, y0) &&
+         canStep(fromZ, x0, y1) && canStep(fromZ, x1, y1);
+}
+
+// The floor under a body of this size, which is the highest of the cells it
+// covers so it never sinks into a step it is standing on the edge of.
+function groundUnder(x, y, r = RADIUS) {
+  const x0 = Math.floor(x - r), x1 = Math.floor(x + r);
+  const y0 = Math.floor(y - r), y1 = Math.floor(y + r);
+  return Math.max(heightAt(x0, y0), heightAt(x1, y0), heightAt(x0, y1), heightAt(x1, y1));
+}
+
+// The same DDA the shader walks, in JS. Returns the distance to the first thing
+// that stops a bullet along a unit ray, or maxDist if it reaches that far
+// unobstructed. Used for shooting and for line of sight, both of which see over
+// waist high cover, so this tests opaqueAt rather than solidAt.
+function castWall(ox, oy, dx, dy, maxDist) {
+  let cx = Math.floor(ox), cy = Math.floor(oy);
+  const dtx = Math.abs(1 / dx), dty = Math.abs(1 / dy);
+  const sx = dx < 0 ? -1 : 1, sy = dy < 0 ? -1 : 1;
+  let tx = (dx < 0 ? ox - cx : cx + 1 - ox) * dtx;
+  let ty = (dy < 0 ? oy - cy : cy + 1 - oy) * dty;
+  let t = 0;
+  while (t < maxDist) {
+    if (tx < ty) { t = tx; tx += dtx; cx += sx; } else { t = ty; ty += dty; cy += sy; }
+    if (opaqueAt(cx, cy)) return t;
+  }
+  return maxDist;
+}
+
+// ---------------------------------------------------------------------------
+// Game state.
+//
+// Five screens. Everything except PLAY freezes the world: the frame loop still
+// runs and still draws, so the level sits behind the menu, but nothing moves.
+// ---------------------------------------------------------------------------
+
+const S_MENU = 0, S_PLAY = 1, S_PAUSE = 2, S_DEAD = 3, S_CLEAR = 4;
+let state = S_MENU;
+
+const screens = {};   // filled in by main() once the DOM exists
+
+function setState(next) {
+  state = next;
+  if (!screens.menu) return;
+  screens.menu.classList.toggle("off", next !== S_MENU);
+  screens.pause.classList.toggle("off", next !== S_PAUSE);
+  screens.over.classList.toggle("off", next !== S_DEAD && next !== S_CLEAR);
+  screens.hud.classList.toggle("off", next === S_MENU);
+  screens.hint.classList.toggle("off", next !== S_PLAY || player.walked > 0.5);
+  if (next === S_DEAD || next === S_CLEAR) {
+    const won = next === S_CLEAR;
+    screens.msg.textContent = won ? "AREA CLEAR" : "YOU DIED";
+    screens.sub.textContent = won ? "CLICK FOR THE NEXT LEVEL" : "CLICK TO TRY AGAIN";
+  }
+  // Anything other than playing releases the mouse, so a click on a menu can
+  // never also be a shot.
+  if (next !== S_PLAY) {
+    player.firing = false;
+    keys.clear();
+    if (document.pointerLockElement) document.exitPointerLock();
+  }
+  if (audio) {
+    // Duck the music behind a menu rather than stopping it.
+    audio.music.gain.setTargetAtTime(next === S_PLAY ? MUSIC_GAIN : MUSIC_GAIN * 0.35,
+                                     audio.ctx.currentTime, 0.15);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Settings, kept in localStorage so they survive a reload.
+// ---------------------------------------------------------------------------
+
+const settings = {
+  sensitivity: 1.0,
+  fov: 0.8,
+  volume: 0.5,
+  music: 0.6,
+  difficulty: 1,        // 0 easy, 1 normal, 2 hard
+};
+
+const DIFFICULTY = [
+  { label: "EASY", damage: 0.6, speed: 0.85 },
+  { label: "NORMAL", damage: 1.0, speed: 1.0 },
+  { label: "HARD", damage: 1.5, speed: 1.2 },
+];
+
+// Keys are prefixed because games on the competition site share an origin, and
+// nothing here ever calls localStorage.clear() for the same reason.
+const STORE = "umbra.";
+
+function loadSettings() {
+  try {
+    Object.assign(settings, JSON.parse(localStorage.getItem(STORE + "settings") || "{}"));
+    best = Math.max(1, parseInt(localStorage.getItem(STORE + "best") || "1", 10) || 1);
+  } catch (e) {
+    // A corrupt or unavailable store is not worth failing over.
+  }
+  camera.fov = settings.fov;
+}
+
+function saveSettings() {
+  try {
+    localStorage.setItem(STORE + "settings", JSON.stringify(settings));
+  } catch (e) {
+    // Private browsing refuses writes. The settings still apply this session.
+  }
+}
+
+function recordBest(reached) {
+  if (reached <= best) return;
+  best = reached;
+  try {
+    localStorage.setItem(STORE + "best", String(best));
+  } catch (e) {
+    // Same as above: not worth failing over.
+  }
+}
+
+// fov is stored the way the shader wants it, as the half width of the camera
+// plane at unit distance, but presented in degrees because that is what a
+// player expects to see on a slider.
+function fovToDegrees(f) {
+  return Math.round(2 * Math.atan(f) * 180 / Math.PI);
+}
+
+function degreesToFov(deg) {
+  return Math.tan(deg / 2 * Math.PI / 180);
+}
+
+// ---------------------------------------------------------------------------
+// Screens and controls. All of the DOM lives here; the rest of the game only
+// ever touches the hud and screens objects.
+// ---------------------------------------------------------------------------
+
+function bindUi(canvas) {
+  const $ = (id) => document.getElementById(id);
+
+  hud.hp = $("hp");
+  hud.ammo = $("ammo");
+  hud.ammoName = $("ammoName");
+  hud.kills = $("kills");
+  hud.lvl = $("lvl");
+  hud.arm = $("arm");
+  hud.stam = $("stam");
+  hud.best = $("best");
+  hud.face = $("face");
+  hud.brow = hud.face.querySelector(".brow");
+  hud.mouth = hud.face.querySelector(".mouth");
+  hud.keyRed = $("kr");
+  hud.keyBlue = $("kb");
+  hud.note = $("note");
+
+  screens.menu = $("menu");
+  screens.settings = $("settingsPanel");
+  screens.pause = $("pause");
+  screens.over = $("over");
+  screens.hud = $("hud");
+  screens.hint = $("hint");
+  screens.msg = $("msg");
+  screens.sub = $("sub");
+
+  installInput(canvas);
+
+  // Settings can be reached from the menu or from the pause screen, and BACK
+  // has to return to whichever it was.
+  let settingsFrom = S_MENU;
+  const openSettings = (from) => {
+    settingsFrom = from;
+    screens.menu.classList.add("off");
+    screens.pause.classList.add("off");
+    screens.settings.classList.remove("off");
+  };
+  const closeSettings = () => {
+    screens.settings.classList.add("off");
+    setState(settingsFrom);
+  };
+
+  $("play").onclick = () => {
+    level = 1;
+    restart(false);
+    player.melt = 1;
+    setState(S_PLAY);
+    Promise.resolve(canvas.requestPointerLock()).catch(() => {});
+  };
+  $("toSettings").onclick = () => openSettings(S_MENU);
+  $("pauseSettings").onclick = () => openSettings(S_PAUSE);
+  $("backFromSettings").onclick = closeSettings;
+  $("resume").onclick = () => setState(S_PLAY);
+  $("quit").onclick = () => { level = 1; restart(false); player.melt = 1; setState(S_MENU); };
+
+  // Weapon slots, built from the table that already names them.
+  $("slots").innerHTML = WEAPONS
+    .map((w, i) => "<div id=w" + i + "><u>" + (i + 1) + "</u>" + w.name + "</div>").join("");
+  hud.slots = WEAPONS.map((w, i) => $("w" + i));
+
+  // One entry per setting: the label, the slider range, and how it reads,
+  // writes and prints. The row markup and the wiring both come from here.
+  const SLIDERS = [
+    ["SENSITIVITY", 20, 300, 5,
+      () => settings.sensitivity * 100, (v) => { settings.sensitivity = v / 100; },
+      () => settings.sensitivity.toFixed(2)],
+    ["FIELD OF VIEW", 55, 130, 1,
+      () => fovToDegrees(settings.fov),
+      (v) => { settings.fov = degreesToFov(v); camera.fov = settings.fov; },
+      () => fovToDegrees(settings.fov) + " DEG"],
+    ["VOLUME", 0, 100, 1,
+      () => settings.volume * 100, (v) => { settings.volume = v / 100; applyVolume(); },
+      () => Math.round(settings.volume * 100) + "%"],
+    ["MUSIC", 0, 100, 1,
+      () => settings.music * 100, (v) => { settings.music = v / 100; applyVolume(); },
+      () => Math.round(settings.music * 100) + "%"],
+    ["DIFFICULTY", 0, 2, 1,
+      () => settings.difficulty, (v) => { settings.difficulty = v; },
+      () => DIFFICULTY[settings.difficulty].label],
+  ];
+
+  $("rows").innerHTML = SLIDERS.map(([label, min, max, step], i) =>
+    "<div class=row><span>" + label + "</span>" +
+    "<input type=range min=" + min + " max=" + max + " step=" + step + " id=s" + i + ">" +
+    "<span id=v" + i + "></span></div>").join("");
+
+  SLIDERS.forEach(([, , , , read, write, print], i) => {
+    const el = $("s" + i), out = $("v" + i);
+    const show = () => { out.textContent = print(); };
+    el.value = read();
+    show();
+    el.oninput = () => { write(Number(el.value)); show(); };
+    el.onchange = saveSettings;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Pathfinding.
+//
+// One breadth first sweep from the player over every open cell, storing which
+// way each cell should walk to get closer. Enemies then read one byte instead
+// of searching, so the cost is a single flood fill shared by all of them, and
+// only when the player changes cell.
+//
+// Walking straight at a remembered position is what made enemies look stupid
+// in corridors: they would press into the wall between them and the player and
+// slide along it. The field goes round corners because it only ever steps
+// between cells that are connected.
+// ---------------------------------------------------------------------------
+
+const FLOW_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+const FLOW = new Int8Array(MAP_SIZE * MAP_SIZE);
+let flowFrom = -1;
+
+function buildFlow() {
+  const start = Math.floor(camera.y) * MAP_SIZE + Math.floor(camera.x);
+  if (start === flowFrom || solidAt(Math.floor(camera.x), Math.floor(camera.y))) return;
+  flowFrom = start;
+  FLOW.fill(-1);
+  FLOW[start] = 4;                       // arrived
+  const queue = [start];
+  for (let head = 0; head < queue.length; head++) {
+    const c = queue[head];
+    const x = c % MAP_SIZE, y = (c / MAP_SIZE) | 0;
+    for (let d = 0; d < 4; d++) {
+      const nx = x + FLOW_DIRS[d][0], ny = y + FLOW_DIRS[d][1];
+      if (nx < 0 || ny < 0 || nx >= MAP_SIZE || ny >= MAP_SIZE) continue;
+      const ni = ny * MAP_SIZE + nx;
+      if (FLOW[ni] !== -1 || solidAt(nx, ny)) continue;
+      // Both directions have to be walkable, or the field routes enemies at a
+      // step they cannot climb and they pile up against it.
+      const hz = heightAt(x, y), nz = heightAt(nx, ny);
+      if (Math.abs(hz - nz) > CLIMB) continue;
+      // Walking back the way the sweep came from walks towards the player.
+      FLOW[ni] = d ^ 1;
+      queue.push(ni);
+    }
+  }
+}
+
+// Which way this position should walk to reach the player, or null if it is
+// standing somewhere the sweep never reached.
+function flowStep(x, y) {
+  const c = Math.floor(y) * MAP_SIZE + Math.floor(x);
+  if (c < 0 || c >= FLOW.length) return null;
+  const d = FLOW[c];
+  return d >= 0 && d < 4 ? FLOW_DIRS[d] : null;
+}
+
+// ---------------------------------------------------------------------------
+// Camera and input.
+// ---------------------------------------------------------------------------
+
+const camera = { x: 2.5, y: 6.5, angle: 0.0, pitch: 0.0, fov: 0.8 };
+
+const WALK = 3.2;        // cells per second
+const RUN = 5.8;
+const LOOK = 0.0022;     // radians per pixel at sensitivity 1
+const PITCH_LIMIT = 0.9; // ndc units of horizon shear
+
+const keys = new Set();
+
+addEventListener("keydown", (e) => {
+  keys.add(e.code);
+  if (e.code === "KeyM") toggleMute();
+  if (e.code === "Digit1") selectWeapon(0);
+  if (e.code === "Digit2") selectWeapon(1);
+  if (e.code === "Digit3") selectWeapon(2);
+  if (e.code === "KeyE" || e.code === "Space") tryOpenDoors();
+  if (e.code === "Enter" || e.code === "Space") {
+    if (state === S_DEAD || state === S_CLEAR) {
+      restart(state === S_CLEAR);
+      player.melt = 1;
+      setState(S_PLAY);
+    }
+  }
+  if (e.code === "Escape") {
+    if (state === S_PLAY) setState(S_PAUSE);
+    else if (state === S_PAUSE) setState(S_PLAY);
+  }
+  if (e.code.startsWith("Arrow") || e.code === "Space" || e.code === "Tab") e.preventDefault();
+});
+addEventListener("keyup", (e) => keys.delete(e.code));
+addEventListener("blur", () => {
+  keys.clear();
+  if (state === S_PLAY) setState(S_PAUSE);
+});
+
+function held(...codes) {
+  for (const c of codes) if (keys.has(c)) return true;
+  return false;
+}
+
+function installInput(canvas) {
+  canvas.addEventListener("click", () => {
+    // Browsers only allow audio to start from a gesture, so this is the moment.
+    initAudio();
+    resumeAudio();
+    if (state === S_DEAD || state === S_CLEAR) {
+      restart(state === S_CLEAR);
+      player.melt = 1;
+      setState(S_PLAY);
+    } else if (state === S_PAUSE) {
+      setState(S_PLAY);
+    } else if (state !== S_PLAY) {
+      return;
+    }
+    // Chrome refuses a re-lock for a moment after Esc, and returns a promise
+    // that rejects when it does; swallow it rather than throw at the user.
+    if (document.pointerLockElement !== canvas) {
+      Promise.resolve(canvas.requestPointerLock()).catch(() => {});
+    }
+  });
+
+  // The frame loop stops when the tab is hidden, so the music should stop too
+  // rather than stutter along on a throttled timer while the game is paused.
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && state === S_PLAY) setState(S_PAUSE);
+    if (!audio) return;
+    if (document.hidden) audio.ctx.suspend();
+    else audio.ctx.resume();
+  });
+
+  addEventListener("mousedown", (e) => {
+    if (e.button === 0 && document.pointerLockElement === canvas) player.firing = true;
+  });
+  addEventListener("mouseup", () => { player.firing = false; });
+  addEventListener("contextmenu", (e) => {
+    if (document.pointerLockElement === canvas) e.preventDefault();
+  });
+
+  // The wheel cycles weapons, skipping the ones not picked up yet.
+  addEventListener("wheel", (e) => {
+    if (document.pointerLockElement !== canvas) return;
+    const dir = e.deltaY > 0 ? 1 : -1;
+    for (let i = 1; i <= 3; i++) {
+      const slot = (player.weapon + dir * i + 9) % 3;
+      if (player.have[slot]) { selectWeapon(slot); return; }
+    }
+  }, { passive: true });
+
+  document.addEventListener("pointerlockchange", () => {
+    const locked = document.pointerLockElement === canvas;
+    if (!locked) {
+      keys.clear();
+      player.firing = false;
+      if (state === S_PLAY) setState(S_PAUSE);
+    }
+  });
+
+  addEventListener("mousemove", (e) => {
+    if (document.pointerLockElement !== canvas) return;
+    const look = LOOK * settings.sensitivity;
+    camera.angle += e.movementX * look;
+    camera.pitch = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, camera.pitch + e.movementY * look));
+  });
+}
+
+function update(dt) {
+  if (player.hp === 0 || state !== S_PLAY) return;
+
+  // Turning with the keyboard too, so the game is playable without a pointer lock.
+  if (held("ArrowLeft")) camera.angle -= 2.2 * dt;
+  if (held("ArrowRight")) camera.angle += 2.2 * dt;
+
+  let forward = 0, strafe = 0;
+  if (held("KeyW", "ArrowUp")) forward += 1;
+  if (held("KeyS", "ArrowDown")) forward -= 1;
+  if (held("KeyD")) strafe += 1;
+  if (held("KeyA")) strafe -= 1;
+
+  // Doors open by walking into them, and E is only needed for the locked ones.
+  tryOpenDoors();
+
+  if (forward === 0 && strafe === 0) {
+    player.bob += (0 - player.bob) * Math.min(1, dt * 8);   // settle the view
+    return;
+  }
+
+  // Sprinting costs stamina and stops when it runs out, so running is a
+  // decision rather than the default way to move.
+  const running = held("ShiftLeft", "ShiftRight") && player.stam > 0.02;
+  const speed = (running ? RUN : WALK) * dt;
+  const c = Math.cos(camera.angle), s = Math.sin(camera.angle);
+  let dx = (c * forward - s * strafe);
+  let dy = (s * forward + c * strafe);
+  const len = Math.hypot(dx, dy);   // no diagonal speed bonus
+  dx = dx / len * speed;
+  dy = dy / len * speed;
+
+  // Axis at a time, so running into a wall at an angle slides along it. A step
+  // taller than CLIMB stops you exactly as a wall does.
+  const wasX = camera.x, wasY = camera.y;
+  const standing = groundUnder(camera.x, camera.y);
+  if (fits(camera.x + dx, camera.y, RADIUS, standing)) camera.x += dx;
+  else camera.x = axisStop(camera.x, dx);
+  if (fits(camera.x, camera.y + dy, RADIUS, standing)) camera.y += dy;
+  else camera.y = axisStop(camera.y, dy);
+
+  if (running) player.stam = Math.max(0, player.stam - dt * 0.34);
+
+  // Head bob and footsteps both key off ground actually covered, so walking
+  // into a wall neither bobs nor sounds like walking.
+  const moved = Math.hypot(camera.x - wasX, camera.y - wasY);
+  player.walked += moved;
+  player.bob += moved * (running ? 4.6 : 3.4);
+  if (player.walked > 1.4) {
+    player.walked = 0;
+    sfxStep();
+    // Footsteps carry, but not nearly as far as gunfire.
+    if (running) wakeFoes(camera.x, camera.y, 7);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Weapons.
+//
+// Three, sharing two ammo pools the way Doom's did: the pistol and the chaingun
+// both eat bullets, the shotgun takes shells. Spread is in radians and applies
+// per pellet, so the shotgun is a close range weapon without needing any code
+// of its own beyond a pellet count.
+// ---------------------------------------------------------------------------
+
+const WEAPONS = [
+  { name: "PISTOL",   ammo: -1, dmg: 22, cool: 0.30, pellets: 1, spread: 0.00, kick: 0.8, range: 48 },
+  { name: "SHOTGUN",  ammo: 1,  dmg: 13, cool: 0.80, pellets: 8, spread: 0.10, kick: 1.6, range: 22 },
+  { name: "CHAINGUN", ammo: 0,  dmg: 11, cool: 0.09, pellets: 1, spread: 0.045, kick: 0.6, range: 48 },
+];
+const AMMO_NAME = ["BULLETS", "SHELLS"];
+
+// ---------------------------------------------------------------------------
+// Entities: enemies, pickups, doors, projectiles and particles.
+//
+// Every array here has a matching fixed size array in the uniform buffer, so
+// the caps are the shader's caps. Anything over the cap simply is not drawn,
+// which for particles is invisible and for the rest cannot happen because the
+// generator places fewer than the cap.
+// ---------------------------------------------------------------------------
+
+const MAX_FOES = 14;
+const MAX_PICKUPS = 12;
+const MAX_SHOTS = 10;
+const MAX_PARTS = 40;
+
+const FOE_R = 0.34;         // must match FOE_R in the shader
+const SHOT_R = 0.16;
+
+// Two enemies. The imp closes and swings; the caster keeps its distance and
+// throws fireballs, which is what makes cover and positioning matter.
+const FOE_KIND = {
+  imp:    { hp: 60,  speed: 1.8, reach: 0.95, swing: 1.05, damage: 9,  sight: 15, ranged: 0 },
+  caster: { hp: 45,  speed: 1.2, reach: 7.0,  swing: 1.9,  damage: 12, sight: 17, ranged: 1 },
+  brute:  { hp: 150, speed: 1.05, reach: 1.25, swing: 1.5, damage: 22, sight: 13, ranged: 0 },
+};
+const FOE_INDEX = { imp: 0, caster: 1, brute: 2 };
+
+const BASE_SEED = 1337;
+const START = [0, 0];
+const FOE_SPAWNS = [];
+
+const player = {
+  hp: 100, armour: 0, kills: 0, hurt: 0, dead: 0, cool: 0, gun: 0, flash: 0,
+  firing: false, walked: 0, bob: 0, shake: 0, hurtDir: 0, stam: 1, switching: 0, melt: 0,
+  z: 0,                    // elevation of the ground underfoot
+  weapon: 0, have: [true, false, false], ammo: [50, 0], keys: [false, false],
+};
+
+let foes = [];
+let pickups = [];
+let doors = [];
+let shots = [];
+let parts = [];
+let level = 1;
+let best = 1;
+
+// The way out, and the room that does not let you leave until it is empty.
+const exitAt = [0, 0];
+let arena = null;
+
+// --- particles ---------------------------------------------------------------
+
+// Kind decides the colour and the physics in the shader and here: 0 blood,
+// 1 spark, 2 smoke, 3 ember. Particles are cosmetic and are dropped silently
+// once the array is full.
+function spawnPart(x, y, z, kind, spread, count) {
+  for (let i = 0; i < count; i++) {
+    if (parts.length >= MAX_PARTS) return;
+    parts.push({
+      x, y, z,
+      vx: (Math.random() - 0.5) * spread,
+      vy: (Math.random() - 0.5) * spread,
+      vz: (Math.random() - 0.2) * spread * 0.8,
+      life: 1, kind,
+    });
+  }
+}
+
+function updateParts(dt) {
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i];
+    p.life -= dt * (p.kind === 2 ? 1.1 : 1.8);
+    if (p.life <= 0) { parts.splice(i, 1); continue; }
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.z += p.vz * dt;
+    // Smoke rises, everything else falls and settles on the floor.
+    if (p.kind === 2) p.vz += 0.5 * dt;
+    else p.vz -= 3.2 * dt;
+    if (p.z < 0.03) { p.z = 0.03; p.vz = 0; p.vx *= 0.6; p.vy *= 0.6; }
+  }
+}
+
+// --- decals ------------------------------------------------------------------
+
+// Blood stays where it was spilt. The shader darkens the floor around each one,
+// so a fight leaves a mark you walk back through later.
+const MAX_DECALS = 16;
+let decals = [];
+
+function spawnDecal(x, y) {
+  decals.push({ x, y, r: 0.5 + Math.random() * 0.35 });
+  if (decals.length > MAX_DECALS) decals.shift();
+}
+
+// --- doors -------------------------------------------------------------------
+
+// A door is a cell that slides up. While it is moving the cell stays solid for
+// movement and the shader draws the leaf hanging from the ceiling; at fully
+// open the solid bit is cleared so bullets and enemies can pass.
+function updateDoors(dt) {
+  for (const d of doors) {
+    if (!d.moving) continue;
+    d.open = Math.min(1, d.open + dt * 1.6);
+    if (d.open >= 1) {
+      d.moving = false;
+      clearBit(SOLID, d.cx, d.cy);
+      clearBit(DOORBIT, d.cx, d.cy);
+    }
+  }
+}
+
+function tryOpenDoors() {
+  for (const d of doors) {
+    if (d.open > 0) continue;
+    if (Math.hypot(d.cx + 0.5 - camera.x, d.cy + 0.5 - camera.y) > 1.4) continue;
+    if (d.key >= 0 && !player.keys[d.key]) {
+      sfxLocked();
+      flashHud(d.key === 0 ? "NEED THE RED KEY" : "NEED THE BLUE KEY");
+      continue;
+    }
+    d.moving = true;
+    sfxDoor(d.cx + 0.5, d.cy + 0.5);
+  }
+}
+
+// --- pickups -----------------------------------------------------------------
+
+// kind: 0 health, 1 bullets, 2 shells, 3 shotgun, 4 chaingun, 5 red key, 6 blue key
+const PICKUP_TEXT = ["+25 HEALTH", "+20 BULLETS", "+8 SHELLS", "SHOTGUN", "CHAINGUN",
+                     "RED KEY", "BLUE KEY", "+50 ARMOUR"];
+
+function takePickup(p) {
+  if (p.kind === 0) {
+    if (player.hp >= 100) return false;
+    player.hp = Math.min(100, player.hp + 25);
+  } else if (p.kind === 1) {
+    player.ammo[0] += 20;
+  } else if (p.kind === 2) {
+    player.ammo[1] += 8;
+  } else if (p.kind === 3 || p.kind === 4) {
+    const slot = p.kind === 3 ? 1 : 2;
+    if (player.have[slot]) {
+      player.ammo[WEAPONS[slot].ammo] += slot === 1 ? 8 : 30;
+    } else {
+      player.have[slot] = true;
+      player.ammo[WEAPONS[slot].ammo] += slot === 1 ? 8 : 40;
+      player.weapon = slot;
+    }
+  } else if (p.kind === 7) {
+    if (player.armour >= 100) return false;
+    player.armour = Math.min(100, player.armour + 50);
+  } else {
+    player.keys[p.kind - 5] = true;
+  }
+  flashHud(PICKUP_TEXT[p.kind]);
+  sfxPickup(p.kind >= 3);
+  return true;
+}
+
+// Stepping into the arena shuts the door behind you and wakes everything
+// inside it. It opens again when the room is empty.
+function updateArena() {
+  if (!arena) return;
+  const here = Math.floor(camera.y) * MAP_SIZE + Math.floor(camera.x);
+  if (arena.armed && arena.cells.has(here)) {
+    arena.armed = false;
+    arena.sealed = true;
+    const d = arena.door;
+    d.open = 0;
+    d.moving = false;
+    setBit(SOLID, d.cx, d.cy);
+    setBit(DOORBIT, d.cx, d.cy);
+    sfxDoor(d.cx + 0.5, d.cy + 0.5);
+    flashHud("SEALED IN");
+    for (const f of foes) {
+      if (f.hp > 0 && arena.cells.has(Math.floor(f.y) * MAP_SIZE + Math.floor(f.x))) {
+        f.alert = 30;
+        f.tx = camera.x;
+        f.ty = camera.y;
+      }
+    }
+  }
+  if (arena.sealed) {
+    const left = foes.some((f) => f.hp > 0 &&
+      arena.cells.has(Math.floor(f.y) * MAP_SIZE + Math.floor(f.x)));
+    if (!left) {
+      arena.sealed = false;
+      arena.door.moving = true;
+      sfxDoor(arena.door.cx + 0.5, arena.door.cy + 0.5);
+      flashHud("THE WAY IS OPEN");
+    }
+  }
+}
+
+function reachedExit() {
+  return Math.hypot(exitAt[0] - camera.x, exitAt[1] - camera.y) < 0.8;
+}
+
+function updatePickups(dt) {
+  if (reachedExit()) {
+    recordBest(level + 1);
+    sfxClear();
+    setState(S_CLEAR);
+    return;
+  }
+  for (const p of pickups) {
+    p.bob += dt;
+    if (p.taken) continue;
+    if (Math.hypot(p.x - camera.x, p.y - camera.y) > 0.7) continue;
+    if (takePickup(p)) {
+      p.taken = true;
+      updateHud();
+    }
+  }
+}
+
+// --- projectiles --------------------------------------------------------------
+
+function spawnShot(x, y, dx, dy, damage) {
+  if (shots.length >= MAX_SHOTS) return;
+  shots.push({ x, y, dx, dy, damage, life: 4 });
+}
+
+function updateShots(dt) {
+  for (let i = shots.length - 1; i >= 0; i--) {
+    const s = shots[i];
+    const step = 7.5 * dt;
+    s.x += s.dx * step;
+    s.y += s.dy * step;
+    s.life -= dt;
+
+    const gone = s.life <= 0 || opaqueAt(Math.floor(s.x), Math.floor(s.y));
+    const hit = Math.hypot(s.x - camera.x, s.y - camera.y) < 0.45;
+    if (hit) {
+      hurtFromDirection(s.damage, s.x, s.y);
+      spawnPart(s.x, s.y, 0.5, 3, 3.0, 8);
+      sfxExplode(s.x, s.y);
+      shots.splice(i, 1);
+    } else if (gone) {
+      spawnPart(s.x, s.y, 0.5, 3, 2.2, 6);
+      sfxExplode(s.x, s.y);
+      shots.splice(i, 1);
+    } else if (Math.random() < dt * 20) {
+      spawnPart(s.x, s.y, 0.5, 2, 0.3, 1);   // a trail of smoke
+    }
+  }
+}
+
+// --- level assembly -----------------------------------------------------------
+
+// Places doors, keys, enemies and pickups into a carved level. Spots are the
+// candidate positions the layout handed back, spread out over the map.
+function buildLevel(seed) {
+  const spots = generate(seed);
+  const tier = Math.min(level, 6);
+
+  START[0] = spots[0].x;
+  START[1] = spots[0].y;
+
+  // Doors in chokepoints, spaced out so a corridor does not become an airlock.
+  doors = [];
+  const chokes = chokepoints();
+  for (let i = 0; i < 40 && doors.length < MAX_DOORS; i++) {
+    if (!chokes.length) break;
+    const c = chokes[randInt(chokes.length)];
+    if (Math.hypot(c.x + 0.5 - START[0], c.y + 0.5 - START[1]) < 6) continue;
+    if (doors.some((d) => Math.hypot(d.cx - c.x, d.cy - c.y) < 8)) continue;
+    setBit(SOLID, c.x, c.y);
+    setBit(DOORBIT, c.x, c.y);
+    doors.push({ cx: c.x, cy: c.y, key: -1, open: 0, moving: false });
+  }
+
+  // One door gets locked from level two onward, and its key goes somewhere the
+  // player can already reach: flood fill from the start with the door shut, and
+  // only place the key inside that region.
+  pickups = [];
+  if (doors.length && level > 1) {
+    const locked = doors[randInt(doors.length)];
+    locked.key = level > 3 && rand() < 0.5 ? 1 : 0;
+    const reachable = regionFrom(Math.floor(START[1]) * MAP_SIZE + Math.floor(START[0]));
+    const cells = [...reachable].filter((i) => {
+      const x = i % MAP_SIZE, y = Math.floor(i / MAP_SIZE);
+      return Math.hypot(x + 0.5 - START[0], y + 0.5 - START[1]) > 5;
+    });
+    if (cells.length) {
+      const i = cells[randInt(cells.length)];
+      pickups.push({ x: (i % MAP_SIZE) + 0.5, y: Math.floor(i / MAP_SIZE) + 0.5,
+                     kind: 5 + locked.key, bob: 0, taken: false });
+    } else {
+      locked.key = -1;   // nowhere fair to put the key, so do not lock the door
+    }
+  }
+
+  // Raised ground first, then crates on whatever is left flat.
+  raiseGround(openCells(), 22 + tier * 5);
+  scatterCover(26 + tier * 6, openCells());
+
+  // Enemies over the remaining spots, casters appearing from level two and
+  // getting more common as the levels go on.
+  // Enemy count ramps with the level instead of starting at the cap, so the
+  // first one is a warm up and the sixth is not.
+  const budget = Math.min(MAX_FOES, 5 + Math.round(tier * 1.6));
+  FOE_SPAWNS.length = 0;
+  for (let i = 1; i < spots.length && FOE_SPAWNS.length < budget; i++) {
+    const count = 1 + (i % 2);
+    for (let k = 0; k < count && FOE_SPAWNS.length < budget; k++) {
+      const x = spots[i].x + (rand() - 0.5) * 2;
+      const y = spots[i].y + (rand() - 0.5) * 2;
+      if (!fits(x, y, FOE_R)) continue;
+      const roll = rand();
+      let kind = "imp";
+      if (level > 2 && roll < 0.10 + tier * 0.035) kind = "brute";
+      else if (level > 1 && roll < 0.30 + tier * 0.05) kind = "caster";
+      FOE_SPAWNS.push([x, y, kind]);
+    }
+  }
+
+  // The way out goes as far from the spawn as the level allows, so clearing it
+  // is a route rather than a lap. Reaching it ends the level; the enemies in
+  // between are an obstacle, not a checklist.
+  const reachable = [...regionFrom(Math.floor(START[1]) * MAP_SIZE + Math.floor(START[0]))];
+  let far = reachable[0], farD = -1;
+  for (const i of reachable) {
+    const d = Math.hypot(i % MAP_SIZE + 0.5 - START[0], Math.floor(i / MAP_SIZE) + 0.5 - START[1]);
+    if (d > farD) { farD = d; far = i; }
+  }
+  exitAt[0] = (far % MAP_SIZE) + 0.5;
+  exitAt[1] = Math.floor(far / MAP_SIZE) + 0.5;
+
+  // An arena: the last unlocked door on the way to the exit shuts behind you
+  // and stays shut until the room is clear. Built from the region the door
+  // seals off, so it works the same in a cave as in a block of rooms.
+  arena = null;
+  for (const d of doors) {
+    if (d.key >= 0) continue;
+    setBit(SOLID, d.cx, d.cy);
+    const behind = regionFrom(Math.floor(exitAt[1]) * MAP_SIZE + Math.floor(exitAt[0]));
+    const spawnSide = behind.has(Math.floor(START[1]) * MAP_SIZE + Math.floor(START[0]));
+    clearBit(SOLID, d.cx, d.cy);
+    setBit(SOLID, d.cx, d.cy);   // doors start closed anyway
+    if (spawnSide || behind.size < 25 || behind.size > 400) continue;
+    arena = { door: d, cells: behind, armed: true, sealed: false };
+    break;
+  }
+
+  // Supplies, weighted by what the player is short of at this point in the run.
+  const supply = [0, 0, 1, 1, 2, 7];
+  if (level === 1) supply.push(3);
+  else if (level === 3) supply.push(4);
+  else supply.push(rand() < 0.5 ? 1 : 2);
+  for (const kind of supply) {
+    if (pickups.length >= MAX_PICKUPS) break;
+    for (let tries = 0; tries < 30; tries++) {
+      const x = 1 + randInt(MAP_SIZE - 2) + 0.5;
+      const y = 1 + randInt(MAP_SIZE - 2) + 0.5;
+      if (!fits(x, y, 0.3)) continue;
+      if (Math.hypot(x - START[0], y - START[1]) < 4) continue;
+      pickups.push({ x, y, kind, bob: rand() * 6, taken: false });
+      break;
+    }
+  }
+}
+
+function spawnFoes() {
+  foes = FOE_SPAWNS.map(([x, y, kind], i) => {
+    const k = FOE_KIND[kind] || FOE_KIND.imp;
+    return {
+      x, y, kind, spec: k, hp: k.hp, hurt: 0, swing: 0, fade: 1,
+      growl: 1 + i * 0.7,     // stagger them so they do not all speak at once
+      alert: 0,               // seconds of memory left
+      tx: x, ty: y,           // last known player position
+      strafe: Math.random() < 0.5 ? 1 : -1,
+    };
+  });
+}
+
+// --- combat -------------------------------------------------------------------
+
+const hud = {};   // filled in by main() once the DOM exists
+
+// The level ends at the exit, not at the last kill. Killing everything is
+// still worth doing, because what they drop is what gets you through the next
+// one, but it is a choice.
+function cleared() {
+  return state === S_CLEAR;
+}
+
+function flashHud(text) {
+  if (!hud.note) return;
+  hud.note.textContent = text;
+  hud.note.classList.remove("off");
+  clearTimeout(hud.noteTimer);
+  hud.noteTimer = setTimeout(() => hud.note.classList.add("off"), 1600);
+}
+
+// Health drives the colour, the brow and the tilt; a recent hit turns the face
+// towards whatever hit you, so it doubles as a damage indicator.
+function updateFace() {
+  if (!hud.face) return;
+  const h = player.hp / 100;
+  const hurt = player.hurt;
+  hud.face.style.background = "rgb(" + Math.round(107 + (1 - h) * 90) + "," +
+    Math.round(74 * h + 10) + "," + Math.round(58 * h + 10) + ")";
+  hud.face.style.transform = "rotate(" + (player.hurtDir > 0 ? -6 : 6) * hurt + "deg)";
+  hud.brow.style.height = (2 + Math.round((1 - h) * 3)) + "px";
+  hud.mouth.style.height = (2 + Math.round((1 - h) * 5)) + "px";
+  hud.mouth.style.background = h > 0.35 ? "#2a1b18" : "#7a1410";
+  hud.face.style.filter = player.hp === 0 ? "grayscale(1) brightness(.45)" : "none";
+}
+
+function updateHud() {
+  if (!hud.hp) return;
+  const w = WEAPONS[player.weapon];
+  hud.hp.textContent = String(player.hp);
+  hud.arm.textContent = String(Math.round(player.armour));
+  hud.ammo.textContent = w.ammo < 0 ? "--" : String(player.ammo[w.ammo]);
+  hud.ammoName.textContent = w.ammo < 0 ? "" : AMMO_NAME[w.ammo];
+  hud.kills.textContent = player.kills + "/" + foes.length;
+  hud.lvl.textContent = String(level);
+  hud.stam.style.width = Math.round(player.stam * 100) + "%";
+  if (hud.best) hud.best.textContent = best > 1 ? "FURTHEST: LEVEL " + best : "";
+  hud.keyRed.classList.toggle("have", player.keys[0]);
+  hud.keyBlue.classList.toggle("have", player.keys[1]);
+  for (let i = 0; i < 3; i++) {
+    hud.slots[i].classList.toggle("dim", !player.have[i]);
+    hud.slots[i].classList.toggle("on", player.weapon === i);
+  }
+  updateFace();
+}
+
+function selectWeapon(slot) {
+  if (slot === player.weapon || !player.have[slot]) return;
+  player.weapon = slot;
+  // The gun drops out of frame and comes back up, and cannot fire on the way.
+  player.switching = 1;
+  player.cool = Math.max(player.cool, 0.3);
+  sfxSwitch();
+  updateHud();
+}
+
+// Damage that knows where it came from, so the screen can say so.
+function hurtFromDirection(amount, sx, sy) {
+  const rel = Math.atan2(sy - camera.y, sx - camera.x) - camera.angle;
+  player.hurtDir = Math.atan2(Math.sin(rel), Math.cos(rel));
+  hurtPlayer(amount);
+}
+
+function hurtPlayer(amount) {
+  if (player.hp === 0 || state !== S_PLAY) return;
+  amount = amount * DIFFICULTY[settings.difficulty].damage;
+  // Armour soaks a third and wears down doing it.
+  if (player.armour > 0) {
+    const soaked = Math.min(player.armour, amount * 0.34);
+    player.armour -= soaked;
+    amount -= soaked;
+  }
+  player.hp = Math.max(0, Math.round(player.hp - amount));
+  player.hurt = 1;
+  player.shake = Math.min(1, player.shake + amount * 0.03);
+  if (player.hp === 0) {
+    keys.clear();
+    sfxDie();
+    setState(S_DEAD);
+  } else {
+    sfxHurt();
+  }
+  updateHud();
+}
+
+// Hitscan. One ray per pellet, all from the centre of the screen, so the
+// crosshair and the bullets cannot disagree.
+function fire() {
+  const w = WEAPONS[player.weapon];
+  if (w.ammo >= 0 && player.ammo[w.ammo] <= 0) {
+    sfxDryFire();
+    player.cool = 0.4;
+    // Fall back to the pistol rather than leaving the player holding nothing.
+    if (player.have[0]) selectWeapon(0);
+    return;
+  }
+  if (w.ammo >= 0) player.ammo[w.ammo]--;
+
+  player.cool = w.cool;
+  player.gun = w.kick;
+  player.flash = 1;
+  player.shake = Math.min(1, player.shake + w.kick * 0.12);
+  sfxShoot(player.weapon);
+  wakeFoes(camera.x, camera.y, 18);   // firing is loud
+
+  for (let pellet = 0; pellet < w.pellets; pellet++) {
+    const spread = (Math.random() - 0.5) * w.spread;
+    const a = camera.angle + spread;
+    const dx = Math.cos(a), dy = Math.sin(a);
+    let hit = null;
+    let range = castWall(camera.x, camera.y, dx, dy, w.range);
+
+    for (const f of foes) {
+      if (f.hp === 0) continue;
+      const ex = f.x - camera.x, ey = f.y - camera.y;
+      const along = ex * dx + ey * dy;
+      if (along <= 0 || along >= range) continue;
+      if (Math.abs(ex * -dy + ey * dx) > FOE_R) continue;
+      hit = f;
+      range = along;
+    }
+
+    if (!hit) {
+      // Sparks where the pellet met the wall.
+      spawnPart(camera.x + dx * range, camera.y + dy * range, 0.5, 1, 1.6, 2);
+      continue;
+    }
+    damageFoe(hit, w.dmg, dx, dy);
+  }
+  updateHud();
+}
+
+function damageFoe(f, amount, dx, dy) {
+  f.hurt = 1;
+  f.hp = Math.max(0, f.hp - amount);
+  // Being shot tells an enemy exactly where you are, even from behind.
+  f.alert = 8;
+  f.tx = camera.x;
+  f.ty = camera.y;
+  spawnPart(f.x - dx * 0.2, f.y - dy * 0.2, 0.55, 0, 2.2, 4);
+  if (f.hp > 0) {
+    sfxImpHit(f.x, f.y);
+    return;
+  }
+  sfxImpDie(f.x, f.y, FOE_INDEX[f.kind]);
+  spawnPart(f.x, f.y, 0.5, 0, 3.4, 10);
+  player.kills++;
+  spawnDecal(f.x, f.y);
+  updateHud();
+}
+
+// Noise wakes anything within earshot, whether or not it can see you.
+function wakeFoes(x, y, radius) {
+  for (const f of foes) {
+    if (f.hp === 0) continue;
+    if (Math.hypot(f.x - x, f.y - y) > radius) continue;
+    f.alert = Math.max(f.alert, 6);
+    f.tx = x;
+    f.ty = y;
+  }
+}
+
+function seesPlayer(f) {
+  const dx = camera.x - f.x, dy = camera.y - f.y;
+  const d = Math.hypot(dx, dy);
+  if (d > f.spec.sight || d < 1e-6) return 0;
+  return castWall(f.x, f.y, dx / d, dy / d, d) >= d ? d : 0;
+}
+
+function stepFoe(f, mx, my, dt) {
+  const ml = Math.hypot(mx, my) || 1;
+  const step = f.spec.speed * DIFFICULTY[settings.difficulty].speed * dt;
+  const nx = (mx / ml) * step, ny = (my / ml) * step;
+  const wasX = f.x, wasY = f.y;
+  const standing = groundUnder(f.x, f.y, FOE_R);
+  if (fits(f.x + nx, f.y, FOE_R, standing)) f.x += nx;
+  if (fits(f.x, f.y + ny, FOE_R, standing)) f.y += ny;
+  // Ground actually covered, so an enemy pressed against a wall stops walking
+  // on the spot the way the player does.
+  f.walking = Math.hypot(f.x - wasX, f.y - wasY) > step * 0.3;
+}
+
+function updateFoes(dt) {
+  for (const f of foes) {
+    f.hurt = Math.max(0, f.hurt - dt * 5);
+    if (f.hp === 0) {
+      f.fade = Math.max(0, f.fade - dt * 1.7);   // the body sinks into the floor
+      continue;
+    }
+    f.swing = Math.max(0, f.swing - dt);
+    f.alert = Math.max(0, f.alert - dt);
+    f.walking = false;
+    if (player.hp === 0 || state !== S_PLAY) continue;
+
+    const seen = seesPlayer(f);
+    if (seen) {
+      f.alert = 8;
+      f.tx = camera.x;
+      f.ty = camera.y;
+      f.growl -= dt;
+      if (f.growl <= 0) {
+        sfxGrowl(f.x, f.y, FOE_INDEX[f.kind]);
+        f.growl = 3 + Math.random() * 6;
+      }
+    }
+
+    // With nothing seen and nothing remembered, hold position. With a memory,
+    // walk to where the player was last known to be, which is what stops an
+    // enemy from freezing the instant you step behind a wall.
+    if (!seen) {
+      if (f.alert <= 0) continue;
+      if (Math.hypot(f.tx - f.x, f.ty - f.y) < 0.6) { f.alert = 0; continue; }
+      // Follow the field rather than the straight line, so a wall between the
+      // two of you is something to walk around rather than press against.
+      //
+      // Aim at the centre of the next cell, not along the raw axis. The field
+      // is computed for points, and an enemy is a box: walking due west along
+      // the top edge of a cell clips the corner of the wall below and the step
+      // is refused every frame, which parks it against the corner forever.
+      // Heading for the centre pulls the body off the corner as it goes.
+      const step = flowStep(f.x, f.y);
+      if (step) {
+        const nx = Math.floor(f.x) + step[0] + 0.5;
+        const ny = Math.floor(f.y) + step[1] + 0.5;
+        stepFoe(f, nx - f.x, ny - f.y, dt);
+      } else {
+        stepFoe(f, f.tx - f.x, f.ty - f.y, dt);
+      }
+      continue;
+    }
+
+    // Casters hold their range and throw; imps close and swing.
+    if (f.spec.ranged) {
+      if (f.swing === 0 && seen < f.spec.reach + 3) {
+        const a = Math.atan2(camera.y - f.y, camera.x - f.x) + (Math.random() - 0.5) * 0.06;
+        spawnShot(f.x + Math.cos(a) * 0.4, f.y + Math.sin(a) * 0.4,
+                  Math.cos(a), Math.sin(a), f.spec.damage);
+        sfxCast(f.x, f.y);
+        f.swing = f.spec.swing;
+      }
+      // Back off if crowded, sidestep otherwise, so it is not a stationary target.
+      const away = seen < f.spec.reach - 1.5 ? -1 : 0.15;
+      const dx = (camera.x - f.x) / seen, dy = (camera.y - f.y) / seen;
+      stepFoe(f, dx * away - dy * f.strafe * 0.7, dy * away + dx * f.strafe * 0.7, dt);
+      if (Math.random() < dt * 0.4) f.strafe = -f.strafe;
+      continue;
+    }
+
+    if (seen < f.spec.reach) {
+      if (f.swing === 0) {
+        sfxSwing(f.x, f.y);
+        hurtFromDirection(f.spec.damage, f.x, f.y);
+        f.swing = f.spec.swing;
+      }
+      continue;
+    }
+
+    // Head for the player, pushing off any other enemy that is too close so a
+    // pack does not collapse into a single stack, with a little sideways drift
+    // so a group arrives spread out rather than in single file.
+    const d = seen;
+    let mx = (camera.x - f.x) / d, my = (camera.y - f.y) / d;
+    mx += -my * f.strafe * 0.25;
+    my += mx * f.strafe * 0.25;
+    for (const g of foes) {
+      if (g === f || g.hp === 0) continue;
+      const ax = f.x - g.x, ay = f.y - g.y;
+      const ad = Math.hypot(ax, ay);
+      if (ad > 1e-6 && ad < 0.9) {
+        mx += (ax / ad) * 0.9;
+        my += (ay / ad) * 0.9;
+      }
+    }
+    stepFoe(f, mx, my, dt);
+  }
+}
+
+function updateEffects(dt) {
+  player.cool = Math.max(0, player.cool - dt);
+  player.gun = Math.max(0, player.gun - dt * 5);
+  player.flash = Math.max(0, player.flash - dt * 9);
+  player.hurt = Math.max(0, player.hurt - dt * 1.6);
+  player.shake = Math.max(0, player.shake - dt * 2.5);
+  player.switching = Math.max(0, player.switching - dt * 3.2);
+  const ground = groundUnder(camera.x, camera.y);
+  player.z += (ground - player.z) * Math.min(1, dt * 12);
+  // Stamina comes back only once you stop sprinting.
+  if (!held("ShiftLeft", "ShiftRight")) player.stam = Math.min(1, player.stam + dt * 0.26);
+
+
+  if (player.hp === 0) {
+    player.dead = Math.min(1, player.dead + dt * 0.7);
+    camera.pitch += (-0.4 - camera.pitch) * Math.min(1, dt * 2);   // head tips back as you fall
+  } else if (player.firing && player.cool === 0 && state === S_PLAY) {
+    fire();
+  }
+}
+
+// Dying rebuilds the same level, so a retry is fair. Clearing it moves the
+// seed on, so the next level is somewhere new. Weapons and ammo carry over
+// between levels but not across a death.
+function restart(advance) {
+  if (advance) {
+    level++;
+  } else {
+    player.have = [true, false, false];
+    player.ammo = [50, 0];
+    player.weapon = 0;
+    player.armour = 0;
+  }
+  buildLevel(BASE_SEED + level);
+  camera.x = START[0];
+  camera.y = START[1];
+  camera.angle = 0;
+  camera.pitch = 0;
+  player.hp = 100;
+  player.kills = 0;
+  player.hurt = 0;
+  player.dead = 0;
+  player.cool = 0;
+  player.firing = false;
+  player.walked = 0;
+  player.bob = 0;
+  player.shake = 0;
+  player.keys = [false, false];
+  shots = [];
+  parts = [];
+  decals = [];
+  player.stam = 1;
+  player.switching = 0;
+  player.z = groundUnder(START[0], START[1]);
+  flowFrom = -1;
+  spawnFoes();
+  updateHud();
+  if (audio) audio.music.gain.setValueAtTime(MUSIC_GAIN, audio.ctx.currentTime);
+}
+
+// ---------------------------------------------------------------------------
+// Audio. One context, one buffer of noise, and nothing else: every sound is
+// built from oscillators and envelopes when it is played. The music is a step
+// sequencer reading packed pattern strings, one character per sixteenth.
+// ---------------------------------------------------------------------------
+
+const BPM = 150;
+const STEPS = 16;
+const ROOT = 55;                          // A1, the tonic everything hangs off
+const MUSIC_GAIN = 0.26;
+
+// One character per step. "." is a rest, anything else is a semitone offset in
+// base 36, so a whole bar of music costs sixteen bytes. Hits land off the
+// eighth as well as on it, or the groove is a metronome.
+//
+// Two sections. A is the bed the level runs on; B brings in the arpeggio and
+// the snare and moves the bass around, so a sixteen bar loop does not wear
+// through the way a four bar one does. Offsets stay inside a minor pentatonic
+// (0, 3, 5, 7, 10) which is why none of this needs a chord table.
+const BASS_A = "0.0.0.0.3.0.5.03";
+const BASS_B = "0.0.5.0.7.0.5.03";
+const ARP = "0.3.7.a.7.3.5.3.";
+const LEAD = "c...a...7...a.c.";      // sits an octave over the arp in section B
+const KICK = "x.....x..xx.....";
+const SNARE = "....x.......x...";
+const HAT = "..x...x...x...xx";
+const PROG_A = [0, 0, 5, 3, 0, 0, 7, 5];  // bar to bar transposition
+const PROG_B = [5, 5, 3, 3, 0, 0, 7, 7];
+const BARS = 16;
+// Sixteenths are nudged off the grid in alternation, which is the difference
+// between a drum machine and something with a pulse.
+const SWING = 0.12;
+
+let audio = null;
+let muted = false;
+
+function noteHz(semi) {
+  return ROOT * Math.pow(2, semi / 12);
+}
+
+function masterLevel() {
+  return muted ? 0 : settings.volume;
+}
+
+function initAudio() {
+  if (audio) return;
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return;
+  const ctx = new Ctx();
+
+  // A compressor on the end glues a shotgun, a fireball and eight bars of
+  // music together instead of letting whichever is loudest win.
+  const master = ctx.createGain();
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -14;
+  comp.ratio.value = 6;
+  comp.attack.value = 0.004;
+  comp.release.value = 0.18;
+  master.gain.value = masterLevel();
+  master.connect(comp);
+  // Makeup gain. A compressor with this much ratio takes six or eight decibels
+  // off everything, and without putting it back the quiet sounds fall under
+  // the floor: the growl and the footstep both measured as silence.
+  const makeup = ctx.createGain();
+  makeup.gain.value = 2.6;
+  comp.connect(makeup);
+  makeup.connect(ctx.destination);
+
+  // Reverb, from an impulse response generated on the spot: noise under an
+  // exponential decay is a serviceable room, and it is the single biggest
+  // improvement available to the way any of this sounds. A corridor shooter
+  // with completely dry gunfire sounds like a menu.
+  const len = Math.floor(ctx.sampleRate * 1.7);
+  const ir = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = ir.getChannelData(ch);
+    for (let i = 0; i < len; i++) {
+      const t = i / len;
+      // A little pre-delay of near silence, then the tail.
+      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 2.6) * (i < 900 ? i / 900 : 1);
+    }
+  }
+  const verb = ctx.createConvolver();
+  verb.buffer = ir;
+  const wet = ctx.createGain();
+  wet.gain.value = 0.34;
+  verb.connect(wet);
+  wet.connect(master);
+
+  // Effects go through a bus that feeds both the dry path and the reverb.
+  const bus = ctx.createGain();
+  bus.connect(master);
+  bus.connect(verb);
+
+  const music = ctx.createGain();
+  music.gain.value = MUSIC_GAIN;
+  music.connect(master);
+  const musicSend = ctx.createGain();
+  musicSend.gain.value = 0.18;      // the music sits drier than the world
+  music.connect(musicSend);
+  musicSend.connect(verb);
+
+  // A second of white noise, reused by every effect that needs it.
+  const noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+  const data = noise.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+
+  audio = { ctx, master, music, bus, verb, wet, noise, next: ctx.currentTime + 0.1, step: 0 };
+  setInterval(schedule, 25);
+}
+
+function resumeAudio() {
+  if (audio && audio.ctx.state === "suspended") audio.ctx.resume();
+}
+
+function applyVolume() {
+  if (audio) {
+    audio.master.gain.value = masterLevel();
+    audio.music.gain.value = MUSIC_GAIN * settings.music * (state === S_PLAY ? 1 : 0.35);
+  }
+}
+
+function toggleMute() {
+  muted = !muted;
+  applyVolume();
+}
+
+// --- voices ----------------------------------------------------------------
+
+function envelope(source, t, peak, attack, decay, out) {
+  const g = audio.ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(peak, t + attack);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
+  source.connect(g);
+  g.connect(out || audio.bus);
+  return g;
+}
+
+function tone(type, freq, t, peak, attack, decay, out) {
+  const o = audio.ctx.createOscillator();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t);
+  envelope(o, t, peak, attack, decay, out);
+  o.start(t);
+  o.stop(t + attack + decay + 0.05);
+  return o;
+}
+
+function burst(t, peak, decay, type, freq, out) {
+  const s = audio.ctx.createBufferSource();
+  s.buffer = audio.noise;
+  const f = audio.ctx.createBiquadFilter();
+  f.type = type;
+  f.frequency.setValueAtTime(freq, t);
+  s.connect(f);
+  envelope(f, t, peak, 0.002, decay, out);
+  s.start(t, Math.random() * 0.5);
+  s.stop(t + decay + 0.1);
+  return f;
+}
+
+// Gain and stereo placement for something happening out in the level.
+// Placement, distance, and whether there is a wall in the way. A growl through
+// stone should sound like it: the lowpass is what turns the audio into
+// information about where something is rather than only how far.
+function fromWorld(x, y) {
+  const dx = x - camera.x, dy = y - camera.y;
+  const d = Math.hypot(dx, dy) || 0.001;
+  const blocked = castWall(camera.x, camera.y, dx / d, dy / d, d) < d;
+
+  const pan = audio.ctx.createStereoPanner();
+  pan.pan.value = Math.max(-1, Math.min(1,
+    (dx * -Math.sin(camera.angle) + dy * Math.cos(camera.angle)) / d));
+  const muffle = audio.ctx.createBiquadFilter();
+  muffle.type = "lowpass";
+  muffle.frequency.value = blocked ? 420 : 20000;
+  const g = audio.ctx.createGain();
+  g.gain.value = (blocked ? 0.55 : 1) / (1 + d * d * 0.04);
+  pan.connect(muffle);
+  muffle.connect(g);
+  g.connect(audio.bus);
+  return pan;
+}
+
+// --- effects ---------------------------------------------------------------
+
+// One shot per weapon. The pistol is a crack, the shotgun is a longer and much
+// lower boom, the chaingun is a thinner and faster version of the pistol so it
+// can repeat nine times a second without turning into noise.
+// Every gun is built the same way: a transient that gives it attack, a body
+// that gives it weight, and a tail that gives it a room. What changes between
+// them is the balance. The pistol is mostly transient, the shotgun mostly
+// body, and the chaingun is trimmed so nine of them a second do not smear.
+function sfxShoot(weapon) {
+  if (!audio) return;
+  const t = audio.ctx.currentTime;
+  if (weapon === 1) {
+    burst(t, 0.55, 0.012, "highpass", 4200);                 // the crack
+    const boom = burst(t, 1.0, 0.30, "lowpass", 1600);       // the body
+    boom.frequency.exponentialRampToValueAtTime(300, t + 0.3);
+    const o = tone("sawtooth", 190, t, 0.5, 0.001, 0.34);
+    o.frequency.exponentialRampToValueAtTime(38, t + 0.34);
+    tone("sine", 68, t, 0.4, 0.001, 0.16);                   // the thump
+    burst(t + 0.05, 0.18, 0.45, "bandpass", 900);            // the room
+  } else if (weapon === 2) {
+    burst(t, 0.42, 0.008, "highpass", 5200);
+    burst(t, 0.3, 0.055, "bandpass", 2400);
+    const o = tone("square", 340, t, 0.18, 0.001, 0.06);
+    o.frequency.exponentialRampToValueAtTime(95, t + 0.06);
+    tone("sine", 110, t, 0.16, 0.001, 0.05);
+  } else {
+    burst(t, 0.5, 0.010, "highpass", 4600);
+    burst(t, 0.55, 0.10, "bandpass", 1800);
+    tone("square", 150, t, 0.32, 0.001, 0.06);
+    const o = tone("sawtooth", 430, t, 0.24, 0.001, 0.15);
+    o.frequency.exponentialRampToValueAtTime(58, t + 0.15);
+    tone("sine", 82, t, 0.3, 0.001, 0.10);
+  }
+}
+
+function sfxDryFire() {
+  if (!audio) return;
+  const t = audio.ctx.currentTime;
+  burst(t, 0.25, 0.03, "highpass", 3000);
+  tone("square", 140, t, 0.08, 0.001, 0.03);
+}
+
+function sfxSwitch() {
+  if (!audio) return;
+  const t = audio.ctx.currentTime;
+  burst(t, 0.2, 0.05, "bandpass", 2200);
+  tone("square", 420, t, 0.1, 0.002, 0.06);
+}
+
+function sfxImpHit(x, y) {
+  if (!audio) return;
+  const t = audio.ctx.currentTime;
+  const out = fromWorld(x, y);
+  burst(t, 0.5, 0.015, "highpass", 3000, out);   // the impact
+  burst(t, 0.9, 0.09, "bandpass", 700, out);     // the meat
+  tone("triangle", 150, t, 0.3, 0.001, 0.07, out);
+}
+
+function sfxImpDie(x, y, kind) {
+  if (!audio) return;
+  const t = audio.ctx.currentTime;
+  const out = fromWorld(x, y);
+  // The voice gives out, then the body lands.
+  growlVoice(t, x, y, kind === 2 ? 150 : 260, 32, kind === 2 ? 0.9 : 0.6,
+             kind === 2 ? 240 : 620, 0.75);
+  burst(t + (kind === 2 ? 0.55 : 0.35), 0.7, 0.22, "lowpass", 420, out);
+  tone("sine", 55, t + (kind === 2 ? 0.55 : 0.35), 0.5, 0.002, 0.2, out);
+}
+
+// Two bandpasses over a sawtooth make a rough vowel, which is what turns a
+// buzz into a voice. Each enemy gets its own register so you can tell what is
+// in the room with you without looking: the imp snarls, the caster hisses
+// upward, and the brute is a low roar you feel before you see it.
+function growlVoice(t, x, y, base, glide, len, formant, level) {
+  const out = fromWorld(x, y);
+  const o = audio.ctx.createOscillator();
+  o.type = "sawtooth";
+  o.frequency.setValueAtTime(base, t);
+  o.frequency.exponentialRampToValueAtTime(Math.max(20, glide), t + len);
+  const f1 = audio.ctx.createBiquadFilter();
+  f1.type = "bandpass";
+  f1.frequency.value = formant;
+  f1.Q.value = 4;
+  const f2 = audio.ctx.createBiquadFilter();
+  f2.type = "bandpass";
+  f2.frequency.value = formant * 2.4;
+  f2.Q.value = 6;
+  o.connect(f1);
+  f1.connect(f2);
+  envelope(f2, t, level * 2.6, 0.05, len, out);
+  // A breath of noise under it, which is most of what sells it as an animal.
+  burst(t, level * 0.8, len * 0.8, "bandpass", formant * 1.5, out);
+  // A little body underneath, which a pair of bandpasses cannot provide.
+  tone("sine", base * 0.5, t, level * 0.5, 0.03, len * 0.7, out);
+  o.start(t);
+  o.stop(t + len + 0.1);
+  return o;
+}
+
+function sfxGrowl(x, y, kind) {
+  if (!audio) return;
+  const t = audio.ctx.currentTime;
+  const r = Math.random();
+  if (kind === 1) growlVoice(t, x, y, 220 + r * 60, 420, 0.5, 900, 0.5);
+  else if (kind === 2) growlVoice(t, x, y, 62 + r * 10, 40, 0.9, 260, 0.85);
+  else growlVoice(t, x, y, 120 + r * 40, 74, 0.55, 520, 0.6);
+}
+
+function sfxSwing(x, y) {
+  if (!audio) return;
+  const t = audio.ctx.currentTime;
+  const f = burst(t, 0.6, 0.18, "bandpass", 2400, fromWorld(x, y));
+  f.frequency.exponentialRampToValueAtTime(400, t + 0.18);
+}
+
+// A caster winding up. Deliberately distinct from anything else in the mix,
+// because it is the cue to break line of sight.
+function sfxCast(x, y) {
+  if (!audio) return;
+  const t = audio.ctx.currentTime;
+  const out = fromWorld(x, y);
+  const o = tone("triangle", 300, t, 0.4, 0.03, 0.3, out);
+  o.frequency.exponentialRampToValueAtTime(900, t + 0.3);
+}
+
+function sfxExplode(x, y) {
+  if (!audio) return;
+  const t = audio.ctx.currentTime;
+  const out = fromWorld(x, y);
+  burst(t, 0.8, 0.35, "lowpass", 700, out);
+  const o = tone("sawtooth", 180, t, 0.4, 0.005, 0.3, out);
+  o.frequency.exponentialRampToValueAtTime(35, t + 0.3);
+}
+
+function sfxHurt() {
+  if (!audio) return;
+  const t = audio.ctx.currentTime;
+  const o = tone("triangle", 180, t, 0.5, 0.002, 0.3);
+  o.frequency.exponentialRampToValueAtTime(70, t + 0.3);
+  burst(t, 0.35, 0.15, "lowpass", 500);
+}
+
+function sfxDie() {
+  if (!audio) return;
+  const t = audio.ctx.currentTime;
+  const o = tone("sawtooth", 200, t, 0.55, 0.02, 1.6);
+  o.frequency.exponentialRampToValueAtTime(28, t + 1.6);
+  audio.music.gain.linearRampToValueAtTime(0.02, t + 1.2);
+}
+
+function sfxClear() {
+  if (!audio) return;
+  const t = audio.ctx.currentTime;
+  [0, 7, 12, 19].forEach((semi, i) => {
+    tone("square", noteHz(24 + semi), t + i * 0.11, 0.22, 0.01, 0.3);
+  });
+}
+
+// Rising for a pickup, and a brighter one for a weapon so the two are not
+// confused across a room.
+function sfxPickup(big) {
+  if (!audio) return;
+  const t = audio.ctx.currentTime;
+  const steps = big ? [0, 5, 12] : [0, 7];
+  steps.forEach((semi, i) => {
+    tone("square", noteHz(36 + semi), t + i * 0.06, 0.18, 0.005, 0.14);
+  });
+}
+
+function sfxDoor(x, y) {
+  if (!audio) return;
+  const t = audio.ctx.currentTime;
+  const out = fromWorld(x, y);
+  const f = burst(t, 0.5, 0.7, "lowpass", 400, out);
+  f.frequency.exponentialRampToValueAtTime(900, t + 0.7);
+  tone("triangle", 70, t, 0.25, 0.05, 0.7, out);
+}
+
+function sfxLocked() {
+  if (!audio) return;
+  const t = audio.ctx.currentTime;
+  tone("square", 160, t, 0.22, 0.002, 0.09);
+  tone("square", 120, t + 0.11, 0.22, 0.002, 0.09);
+}
+
+function sfxStep() {
+  if (!audio) return;
+  // A lowpass this low throws away most of the noise, so the burst has to be
+  // driven hard to end up as a soft thud rather than as nothing at all.
+  const t = audio.ctx.currentTime;
+  burst(t, 1.1, 0.06, "lowpass", 520);
+  tone("sine", 72, t, 0.10, 0.002, 0.08);
+}
+
+// --- the song --------------------------------------------------------------
+
+function bassVoice(t, freq) {
+  const o = audio.ctx.createOscillator();
+  o.type = "sawtooth";
+  o.frequency.setValueAtTime(freq, t);
+  const lp = audio.ctx.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.frequency.setValueAtTime(1500, t);
+  lp.frequency.exponentialRampToValueAtTime(280, t + 0.17);
+  o.connect(lp);
+  envelope(lp, t, 0.5, 0.004, 0.17, audio.music);
+  o.start(t);
+  o.stop(t + 0.25);
+}
+
+function leadVoice(t, freq, level, decay) {
+  for (const detune of [-7, 7]) {
+    const o = audio.ctx.createOscillator();
+    o.type = "square";
+    o.frequency.setValueAtTime(freq, t);
+    o.detune.setValueAtTime(detune, t);
+    envelope(o, t, level, 0.01, decay, audio.music);
+    o.start(t);
+    o.stop(t + decay + 0.1);
+  }
+}
+
+// A slow pad under everything, three detuned saws through a filter that opens
+// across the bar. It is what stops the loop sounding like four instruments
+// playing in an empty room.
+function padVoice(t, freq, len) {
+  const lp = audio.ctx.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.frequency.setValueAtTime(320, t);
+  lp.frequency.linearRampToValueAtTime(1500, t + len * 0.6);
+  lp.frequency.linearRampToValueAtTime(400, t + len);
+  for (const detune of [-11, 0, 12]) {
+    const o = audio.ctx.createOscillator();
+    o.type = "sawtooth";
+    o.frequency.setValueAtTime(freq, t);
+    o.detune.setValueAtTime(detune, t);
+    o.connect(lp);
+    o.start(t);
+    o.stop(t + len + 0.2);
+  }
+  envelope(lp, t, 0.10, len * 0.35, len * 0.65, audio.music);
+}
+
+function playStep(i, at) {
+  const s = i % STEPS;
+  const bar = Math.floor(i / STEPS) % BARS;
+  const sectionB = bar >= BARS / 2;
+  const key = (sectionB ? PROG_B : PROG_A)[bar % 8];
+  const beat = 60 / BPM / 4;
+  // Every other sixteenth lands late, which is the swing.
+  const t = at + (s % 2 ? beat * SWING : 0);
+
+  const b = parseInt((sectionB ? BASS_B : BASS_A)[s], 36);
+  if (b === b) bassVoice(t, noteHz(key + b));
+
+  // The pad holds the root under each bar.
+  if (s === 0) padVoice(at, noteHz(key + 12), beat * 15);
+
+  // The arpeggio and the melody over it only run in the second section, which
+  // is what gives the loop somewhere to go.
+  const a = parseInt(ARP[s], 36);
+  if (a === a && sectionB) leadVoice(t, noteHz(key + a + 24), 0.075, 0.2);
+  const l = parseInt(LEAD[s], 36);
+  if (l === l && sectionB && bar >= 12) leadVoice(t, noteHz(key + l + 24), 0.05, 0.5);
+
+  if (KICK[s] !== ".") {
+    const o = tone("sine", 130, at, 0.75, 0.002, 0.17, audio.music);
+    o.frequency.exponentialRampToValueAtTime(42, at + 0.12);
+    burst(at, 0.25, 0.02, "lowpass", 2600, audio.music);   // beater click
+  }
+  if (sectionB && SNARE[s] !== ".") {
+    burst(t, 0.38, 0.14, "highpass", 1500, audio.music);
+    burst(t, 0.2, 0.05, "bandpass", 420, audio.music);
+    tone("triangle", 185, t, 0.12, 0.002, 0.09, audio.music);
+  }
+  if (HAT[s] !== ".") {
+    burst(t, s % 4 === 2 ? 0.11 : 0.07, 0.035, "highpass", 7600, audio.music);
+  }
+}
+
+// Schedule a little way ahead of the clock, so the music keeps time even when
+// the frame loop stutters or the tab stops animating.
+function schedule() {
+  if (!audio || audio.ctx.state !== "running") return;
+  const spacing = 60 / BPM / 4;
+  while (audio.next < audio.ctx.currentTime + 0.12) {
+    playStep(audio.step, audio.next);
+    audio.next += spacing;
+    audio.step++;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Shader. Fullscreen triangle in the vertex stage, DDA raycast in the fragment
+// stage. Screen space is y-down, so the horizon sits at ndc.y == 0 and walls
+// span |ndc.y| < halfHeight.
+// ---------------------------------------------------------------------------
+
+const SHADER = `
+struct Uniforms {
+  res  : vec2f,      // canvas size in pixels
+  fov  : f32,        // half-width of the camera plane at unit distance
+  time : f32,
+  cam  : vec2f,      // camera position in map cells
+  ang  : f32,        // camera heading, radians, 0 = +x
+  pitch: f32,        // horizon shear in ndc units, positive looks down
+  gun  : f32,        // recoil, peaks at the shot and decays to 0
+  flash: f32,        // muzzle flash, same shape, faster decay
+  hurt : f32,        // red damage wash
+  dead : f32,        // death fade
+  bob  : f32,        // walk cycle phase, radians
+  shakeX : f32,      // screen shake offset in ndc
+  shakeY : f32,
+  hudTop : f32,      // height of the status bar in ndc, so the gun clears it
+  eyeZ   : f32,      // where the eye is, which moves as the player climbs
+  weapon : f32,      // which gun is in your hands
+  hurtDir: f32,      // bearing of the last hit, relative to the view
+  shake  : f32,      // shake amount, also drives the damage vignette
+  keys   : f32,      // bit 0 red, bit 1 blue, for the minimap legend
+  exitX  : f32,      // the way out, as two scalars rather than a vec2f: a
+  exitY  : f32,      // vec2f here would be moved to the next eight byte
+                     // boundary and shift every array below it
+  melt   : f32,      // screen wipe, 0 to 1
+  switching : f32,   // weapon change, 1 down to 0
+  // Pads the header to exactly 128 bytes so the arrays below start at float
+  // 32, which is where the JavaScript writes them. Counted, not guessed: the
+  // fields above end at byte 100, this vec4f aligns to 112 and fills to 128.
+  pad0   : vec4f,
+  solid : array<vec4u, 32>,   // 64 rows of 64 bits: blocks movement
+  low   : array<vec4u, 32>,   // waist high: blocks movement, not sight
+  doorbit : array<vec4u, 32>, // this cell is a door
+  hgt0  : array<vec4u, 32>,   // floor height, low bit
+  hgt1  : array<vec4u, 32>,   // floor height, high bit
+  foes  : array<vec4f, 14>,   // xy pos, z liveness 1..0, w = hurt + 2 * kind
+  doors : array<vec4f, 8>,    // xy cell, z open 0..1, w key (-1 none, 0 red, 1 blue)
+  picks : array<vec4f, 12>,   // xy pos, z kind, w bob phase (negative = taken)
+  shots : array<vec4f, 10>,   // xy pos, z unused, w life
+  parts : array<vec4f, 40>,   // xy pos, z height, w = kind + life
+  decals: array<vec4f, 16>,   // xy pos, z radius, w unused (negative = empty)
+};
+
+@group(0) @binding(0) var<uniform> U : Uniforms;
+// The frame before the last scene change, held so the wipe has something to
+// slide. Without it the only thing available to slide is darkness, and a
+// black curtain covering the screen is just a black screen.
+@group(0) @binding(1) var snapTex : texture_2d<f32>;
+@group(0) @binding(2) var snapSmp : sampler;
+
+const MAP_SIZE : i32 = 64;
+const MAX_STEPS : i32 = 200;
+const WALL_HEIGHT : f32 = 0.6;
+const FOG : f32 = 0.10;
+const SUN : vec3f = vec3f(0.55, 0.62, -0.56);
+const LOW_H : f32 = 0.34;
+const STEP_H : f32 = 0.25;     // one step of elevation      // height of waist high cover, world units
+const FOE_R : f32 = 0.34;      // billboard half-width in cells, shared with the JS
+const SPRITE_H : f32 = 0.82;   // enemy sprite height as a fraction of the wall
+const PICK_R : f32 = 0.22;
+const PICK_H : f32 = 0.34;
+const SHOT_R : f32 = 0.17;
+// Turns sprite-vertical units into sprite-horizontal ones, so circles stay round.
+const SPR_K : f32 = 2.0 * WALL_HEIGHT * SPRITE_H / FOE_R;
+
+// --- the grid ---------------------------------------------------------------
+
+fn bitOf(plane : i32, cell : vec2i) -> bool {
+  let i = u32(cell.y) * 2u + (u32(cell.x) >> 5u);
+  let shift = u32(cell.x) & 31u;
+  var word = 0u;
+  if (plane == 0) { word = U.solid[i >> 2u][i & 3u]; }
+  else if (plane == 1) { word = U.low[i >> 2u][i & 3u]; }
+  else if (plane == 2) { word = U.doorbit[i >> 2u][i & 3u]; }
+  else if (plane == 3) { word = U.hgt0[i >> 2u][i & 3u]; }
+  else { word = U.hgt1[i >> 2u][i & 3u]; }
+  return ((word >> shift) & 1u) != 0u;
+}
+
+fn outside(cell : vec2i) -> bool {
+  return cell.x < 0 || cell.y < 0 || cell.x >= MAP_SIZE || cell.y >= MAP_SIZE;
+}
+
+fn solid(cell : vec2i) -> bool {
+  if (outside(cell)) { return true; }
+  return bitOf(0, cell);
+}
+
+// The elevation of the floor in this cell, from the two height planes.
+fn groundAt(cell : vec2i) -> f32 {
+  if (outside(cell)) { return 0.0; }
+  return (select(0.0, 1.0, bitOf(3, cell)) + select(0.0, 2.0, bitOf(4, cell))) * STEP_H;
+}
+
+// How far the door in this cell has slid up, and which key it wants. Doors are
+// few, so a linear scan on the rare cell that carries the door bit is cheaper
+// than a fourth bit plane holding the state.
+fn doorAt(cell : vec2i) -> vec2f {
+  for (var i = 0u; i < 8u; i = i + 1u) {
+    let d = U.doors[i];
+    if (i32(d.x) == cell.x && i32(d.y) == cell.y) { return vec2f(d.z, d.w); }
+  }
+  return vec2f(0.0, -1.0);
+}
+
+// --- procedural texture, no files anywhere ---------------------------------
+
+fn hash21(p : vec2f) -> f32 {
+  return fract(sin(dot(p, vec2f(127.1, 311.7))) * 43758.5453);
+}
+
+fn noise2(p : vec2f) -> f32 {
+  let i = floor(p);
+  let f = p - i;
+  let u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash21(i), hash21(i + vec2f(1.0, 0.0)), u.x),
+             mix(hash21(i + vec2f(0.0, 1.0)), hash21(i + vec2f(1.0, 1.0)), u.x), u.y);
+}
+
+fn fbm(p : vec2f) -> f32 {
+  var sum = 0.0;
+  var amp = 0.5;
+  var q = p;
+  for (var i = 0; i < 4; i = i + 1) {
+    sum = sum + amp * noise2(q);
+    q = q * 2.03;
+    amp = amp * 0.5;
+  }
+  return sum;
+}
+
+// p.x runs along the wall in cells, p.y is height above the floor, 0 to 1.
+fn wallTex(cell : vec2i, p : vec2f) -> vec3f {
+  // Material is picked per block of cells, not per cell, so a wall reads as a
+  // run of one material rather than as confetti.
+  let m = hash21(floor(vec2f(cell) / 3.0) + 0.5);
+  let grain = fbm(p * 8.0);
+  var base : vec3f;
+  if (m < 0.45) {
+    base = vec3f(0.40, 0.39, 0.43) * (0.72 + 0.5 * grain);          // concrete
+  } else if (m < 0.78) {
+    base = mix(vec3f(0.34, 0.18, 0.09), vec3f(0.24, 0.22, 0.24),
+               fbm(p * vec2f(2.0, 9.0)));                           // rust, streaked
+    base = base * (0.8 + 0.4 * grain);
+  } else {
+    base = vec3f(0.19, 0.25, 0.23) * (0.78 + 0.44 * grain);         // painted panels
+  }
+  base = base * (0.88 + 0.24 * hash21(vec2f(cell) + 1.3));          // cell to cell variation
+  // Panel seams across, a joint at every cell edge, rivets where they meet.
+  let band = abs(fract(p.y * 3.0) - 0.5);
+  base = base * (0.74 + 0.26 * smoothstep(0.02, 0.10, band));
+  // Distance to the nearest cell edge, so the joint lands on the grid line
+  // rather than down the middle of the block.
+  let joint = 0.5 - abs(fract(p.x) - 0.5);
+  base = base * (0.78 + 0.22 * smoothstep(0.0, 0.05, joint));
+  let rivet = vec2f(fract(p.x * 2.0) - 0.5, fract(p.y * 3.0) - 0.5);
+  if (dot(rivet, rivet) < 0.0016) {
+    base = base * 1.3;
+  }
+  // Grime creeping up from the floor.
+  return base * mix(0.5, 1.0, smoothstep(0.0, 0.45, p.y + 0.15 * grain));
+}
+
+// Doors are not wall coloured: hazard stripes, tinted by the key
+// they want, so a locked door reads as locked from across the room.
+fn doorTex(p : vec2f, key : f32) -> vec3f {
+  var tint = vec3f(0.55, 0.52, 0.44);
+  if (key > -0.5) {
+    tint = select(vec3f(0.30, 0.44, 0.72), vec3f(0.68, 0.24, 0.20), key < 0.5);
+  }
+  let stripe = fract((p.x + p.y) * 3.0);
+  let band = select(0.62, 1.0, stripe < 0.5);
+  let grain = fbm(p * 7.0);
+  let edge = smoothstep(0.0, 0.06, 0.5 - abs(fract(p.x) - 0.5));
+  return tint * band * (0.75 + 0.4 * grain) * (0.7 + 0.3 * edge);
+}
+
+// Waist high cover: crates. Deliberately not wall coloured, because the whole
+// point of it is that you can tell at a glance it is something to duck behind
+// and shoot over rather than a piece of wall.
+fn crateTex(cell : vec2i, p : vec2f) -> vec3f {
+  let grain = fbm(p * vec2f(9.0, 14.0));
+  var base = mix(vec3f(0.34, 0.24, 0.13), vec3f(0.46, 0.34, 0.19), grain);
+  base = base * (0.9 + 0.2 * hash21(vec2f(cell) + 7.1));
+  // Planks across, with a dark gap between them.
+  let plank = abs(fract(p.y * 3.0) - 0.5);
+  base = base * (0.72 + 0.28 * smoothstep(0.03, 0.14, plank));
+  // A metal band down each edge of the cell.
+  let edge = 0.5 - abs(fract(p.x) - 0.5);
+  if (edge < 0.10) {
+    base = mix(base, vec3f(0.30, 0.31, 0.34), 0.75);
+    if (fract(p.y * 6.0) < 0.3) { base = base * 1.3; }       // rivets
+  }
+  return base;
+}
+
+fn groundTex(p : vec2f, up : bool) -> vec3f {
+  let g = fbm(p * 2.0);
+  // Distance to the nearest cell edge, so tiles line up with the grid the walls
+  // stand on. Measuring to the half-cell instead puts a seam down the view axis.
+  let tile = vec2f(0.5) - abs(fract(p) - 0.5);
+  let inset = min(tile.x, tile.y);
+  let grout = smoothstep(0.0, 0.035, inset);
+  if (up) {
+    // Sparse ceiling panels, so the rooms have a reason to be lit at all.
+    let lamp = step(hash21(floor(p) + 3.7), 0.10) * smoothstep(0.10, 0.17, inset);
+    return vec3f(0.10, 0.10, 0.13) * (0.6 + 0.5 * g) * (0.72 + 0.28 * grout)
+         + vec3f(0.62, 0.56, 0.42) * lamp;
+  }
+  var col = vec3f(0.19, 0.18, 0.21) * (0.6 + 0.55 * g) * (0.72 + 0.28 * grout);
+  // Blood pools where something died and stays there for the rest of the level.
+  for (var i = 0u; i < 16u; i = i + 1u) {
+    let d = U.decals[i];
+    if (d.z <= 0.0) { continue; }
+    let r = length(p - d.xy) / d.z;
+    if (r < 1.0) {
+      let edge = smoothstep(1.0, 0.25, r) * (0.55 + 0.45 * noise2(p * 6.0));
+      col = mix(col, vec3f(0.16, 0.02, 0.02), edge * 0.85);
+    }
+  }
+  return col;
+}
+
+// --- sprites ----------------------------------------------------------------
+
+// The three enemies, drawn in billboard space: u spans -1..1 across the
+// sprite, v runs 0 at the feet to 1 over the head. Returns rgb plus coverage.
+//
+// All three are built the same way and it is worth stating once. A silhouette
+// is what reads at range, so each has a distinct outline and palette. Shading
+// runs along u, which fakes a cylinder and is what stops them looking like
+// stickers. A dark rim on the outer edge separates them from the wall behind.
+// gait swings between -1 and 1 while walking and sits at 0 when still; idle is
+// a slow sway that keeps a stationary enemy from looking like scenery.
+
+// Cylindrical shading plus a rim, applied to every body part.
+fn round3(c : vec3f, u : f32) -> vec3f {
+  let lit = 0.62 + 0.38 * sqrt(max(1.0 - u * u, 0.0));
+  let rim = smoothstep(0.82, 1.0, abs(u));
+  return mix(c * lit, c * 0.35, rim);
+}
+
+// The imp: lean, hunched, long arms, claws, and eyes lit from inside.
+fn impShape(u : f32, v : f32, hurt : f32, gait : f32, idle : f32) -> vec4f {
+  let sway = idle * 0.02;
+  let uu = u - sway * (1.0 - v);
+  let au = abs(uu);
+  var c = vec3f(0.0);
+  var a = 0.0;
+
+  // Legs, swinging in opposition while walking.
+  if (v < 0.40) {
+    let lean = gait * 0.13 * (0.40 - v);
+    let left = abs(uu + 0.24 + lean) < 0.13;
+    let right = abs(uu - 0.24 + lean * -1.0) < 0.13;
+    if (left || right) {
+      c = vec3f(0.26, 0.09, 0.08);
+      a = 1.0;
+      if (v < 0.07) { c = vec3f(0.16, 0.06, 0.05); }        // feet
+    }
+  }
+  // Torso: narrow waist, wide hunched shoulders.
+  let w = 0.26 + 0.34 * smoothstep(0.36, 0.66, v) - 0.06 * smoothstep(0.66, 0.74, v);
+  if (v >= 0.34 && v < 0.74 && au < w) {
+    c = mix(vec3f(0.30, 0.09, 0.08), vec3f(0.52, 0.17, 0.13), smoothstep(0.34, 0.72, v));
+    a = 1.0;
+    // Ribs.
+    if (fract(v * 9.0) < 0.34 && au < w * 0.7) { c = c * 0.82; }
+  }
+  // Arms hanging past the waist, swinging against the legs.
+  let armSwing = gait * 0.10;
+  if (v >= 0.30 && v < 0.70) {
+    let ax = au - (w + 0.14);
+    if (abs(ax + armSwing * select(1.0, -1.0, uu < 0.0)) < 0.11) {
+      c = vec3f(0.34, 0.11, 0.09);
+      a = 1.0;
+      if (v < 0.36) { c = vec3f(0.78, 0.74, 0.66); }        // claws
+    }
+  }
+  // Head, jutting forward, with a heavy brow.
+  let hd = vec2f(uu, (v - 0.82) * SPR_K);
+  if (dot(hd, hd) < 0.26 * 0.26) {
+    c = vec3f(0.44, 0.14, 0.11);
+    a = 1.0;
+    if (v > 0.86) { c = c * 0.78; }                          // brow shadow
+  }
+  // Jaw.
+  if (v > 0.74 && v < 0.80 && au < 0.19) {
+    c = vec3f(0.36, 0.12, 0.10);
+    a = 1.0;
+    if (fract(uu * 14.0) < 0.4) { c = vec3f(0.80, 0.76, 0.68); }   // teeth
+  }
+  if (v > 0.90 && abs(au - 0.22) < (1.0 - v) * 1.1) {        // horns
+    c = vec3f(0.66, 0.62, 0.54);
+    a = 1.0;
+  }
+  let ed = vec2f(au - 0.10, (v - 0.845) * SPR_K);
+  if (dot(ed, ed) < 0.052 * 0.052) {
+    return vec4f(1.9, 1.25, 0.30, 1.0);                      // eyes
+  }
+  if (a == 0.0) { return vec4f(0.0); }
+  return vec4f(mix(round3(c, uu), vec3f(1.0), hurt), 1.0);
+}
+
+// The caster: hovering, no legs, a hood with nothing in it, and a charge held
+// at the chest that brightens as it winds up.
+fn casterShape(u : f32, v : f32, hurt : f32, t : f32, idle : f32) -> vec4f {
+  let hover = idle * 0.03;
+  let vv = v - hover;
+  let au = abs(u);
+  var c = vec3f(0.0);
+  var a = 0.0;
+
+  // Robe, flaring towards a ragged hem that drifts.
+  let flare = 0.24 + 0.44 * (1.0 - vv);
+  let hem = 0.05 * sin(u * 19.0 + t * 2.0);
+  if (vv > 0.04 && vv < 0.76 && au < flare + select(0.0, hem, vv < 0.18)) {
+    c = mix(vec3f(0.12, 0.10, 0.26), vec3f(0.34, 0.29, 0.58), vv);
+    a = 1.0;
+    // Folds.
+    let fold = sin(u * 11.0 + vv * 3.0);
+    c = c * (0.86 + 0.14 * fold);
+  }
+  // Shoulders and hood.
+  let hd = vec2f(u, (vv - 0.84) * SPR_K);
+  if (dot(hd, hd) < 0.30 * 0.30) {
+    c = vec3f(0.22, 0.18, 0.40);
+    a = 1.0;
+  }
+  let fd = vec2f(u, (vv - 0.82) * SPR_K);
+  if (dot(fd, fd) < 0.19 * 0.19) {
+    c = vec3f(0.02, 0.02, 0.05);                             // the void in the hood
+    a = 1.0;
+  }
+  let ed = vec2f(au - 0.085, (vv - 0.83) * SPR_K);
+  if (dot(ed, ed) < 0.048 * 0.048) {
+    return vec4f(0.5, 1.7, 2.1, 1.0);
+  }
+  // Sleeves, held out to the sides.
+  if (vv > 0.42 && vv < 0.62 && au > 0.30 && au < 0.52) {
+    c = vec3f(0.18, 0.15, 0.34);
+    a = 1.0;
+  }
+  // The charge, pulsing between the hands.
+  let cd = vec2f(u, (vv - 0.50) * SPR_K);
+  let pulse = 0.55 + 0.45 * sin(t * 5.0);
+  if (dot(cd, cd) < (0.10 + 0.03 * pulse) * (0.10 + 0.03 * pulse)) {
+    return vec4f(vec3f(0.30, 1.20, 1.50) * (0.7 + 0.6 * pulse), 1.0);
+  }
+  if (a == 0.0) { return vec4f(0.0); }
+  return vec4f(mix(round3(c, u), vec3f(1.0), hurt), 1.0);
+}
+
+// The brute: twice the width of an imp, armour plates, and a head sunk between
+// shoulders. It rocks side to side as it walks rather than swinging legs.
+fn bruteShape(u : f32, v : f32, hurt : f32, gait : f32, idle : f32) -> vec4f {
+  let rock = gait * 0.05;
+  let uu = u - rock * v;
+  let au = abs(uu);
+  var c = vec3f(0.0);
+  var a = 0.0;
+
+  if (v < 0.32) {                                            // legs
+    let lean = gait * 0.08 * (0.32 - v);
+    if (abs(au - 0.34) < 0.17 + lean * select(-1.0, 1.0, uu > 0.0)) {
+      c = vec3f(0.22, 0.17, 0.12);
+      a = 1.0;
+      if (v < 0.06) { c = vec3f(0.13, 0.11, 0.08); }
+    }
+  }
+  let w = 0.42 + 0.44 * smoothstep(0.30, 0.64, v);           // body to shoulders
+  if (v >= 0.28 && v < 0.72 && au < w) {
+    c = mix(vec3f(0.28, 0.22, 0.15), vec3f(0.42, 0.35, 0.23), smoothstep(0.3, 0.7, v));
+    a = 1.0;
+    // Overlapping plates, lit along their top edge.
+    let band = fract(v * 6.0);
+    if (band < 0.5) { c = c * 1.14; }
+    if (band > 0.44 && band < 0.52) { c = c * 0.7; }
+  }
+  if (v >= 0.32 && v < 0.62 && au >= w && au < w + 0.26) {   // arms
+    c = vec3f(0.26, 0.21, 0.14);
+    a = 1.0;
+    if (v < 0.38) { c = vec3f(0.62, 0.58, 0.50); }           // fists
+  }
+  let hd = vec2f(uu, (v - 0.78) * SPR_K);                    // small sunken head
+  if (dot(hd, hd) < 0.19 * 0.19) {
+    c = vec3f(0.32, 0.26, 0.17);
+    a = 1.0;
+  }
+  if (v > 0.70 && v < 0.75 && au < 0.15) {                   // tusked jaw
+    c = vec3f(0.74, 0.70, 0.62);
+    a = 1.0;
+  }
+  let ed = vec2f(au - 0.075, (v - 0.80) * SPR_K);
+  if (dot(ed, ed) < 0.042 * 0.042) {
+    return vec4f(1.7, 0.55, 0.16, 1.0);
+  }
+  if (a == 0.0) { return vec4f(0.0); }
+  return vec4f(mix(round3(c, uu), vec3f(1.0), hurt), 1.0);
+}
+
+// Pickups. Small, bright, and shaped enough to tell apart across a room.
+fn pickShape(u : f32, v : f32, kind : i32) -> vec4f {
+  let au = abs(u);
+  if (kind == 0) {                                   // health: a cross
+    if ((au < 0.22 && v > 0.20 && v < 0.80) || (au < 0.60 && v > 0.38 && v < 0.62)) {
+      return vec4f(0.95, 0.25, 0.28, 1.0);
+    }
+    return vec4f(0.0);
+  }
+  if (kind == 1 || kind == 2) {                      // ammo: a box, banded
+    if (au < 0.62 && v > 0.18 && v < 0.74) {
+      let band = select(0.7, 1.0, fract(v * 4.0) < 0.5);
+      let c = select(vec3f(0.75, 0.55, 0.20), vec3f(0.55, 0.60, 0.68), kind == 1);
+      return vec4f(c * band, 1.0);
+    }
+    return vec4f(0.0);
+  }
+  if (kind == 3) {                                   // shotgun: long barrel
+    if (v > 0.40 && v < 0.56 && au < 0.85) { return vec4f(0.55, 0.52, 0.55, 1.0); }
+    if (v > 0.24 && v < 0.44 && u > 0.30 && u < 0.62) { return vec4f(0.34, 0.22, 0.14, 1.0); }
+    return vec4f(0.0);
+  }
+  if (kind == 4) {                                   // chaingun: barrel cluster
+    if (v > 0.36 && v < 0.62 && au < 0.80) {
+      let ring = fract(u * 5.0);
+      return vec4f(vec3f(0.48, 0.50, 0.54) * select(0.7, 1.0, ring < 0.5), 1.0);
+    }
+    return vec4f(0.0);
+  }
+  // keys: a card with a bit cut out of it
+  let c = select(vec3f(0.35, 0.55, 0.95), vec3f(0.90, 0.25, 0.22), kind == 5);
+  if (au < 0.46 && v > 0.26 && v < 0.74) {
+    if (u > 0.10 && v > 0.42 && v < 0.58) { return vec4f(c * 0.35, 1.0); }
+    return vec4f(c, 1.0);
+  }
+  return vec4f(0.0);
+}
+
+// --- the gun ----------------------------------------------------------------
+
+// Screen space: origin at the bottom centre, y running up, scaled so the gun
+// fills the lower fifth and the grip runs off the edge.
+//
+// All three are rectangles, but the detail that makes them read as objects
+// rather than blocks is the same in each: a gloved hand holding the grip, a
+// dark outline where the silhouette meets the world, a lit top edge and a
+// shaded underside, and a bore that is actually a hole.
+fn weapon(ndc : vec2f, aspect : f32, bobx : f32, boby : f32) -> vec4f {
+  let which = i32(U.weapon + 0.5);
+  // Recoil pushes the gun down; a weapon change takes it all the way out and
+  // brings the new one back up.
+  let drop = U.gun * 0.16 + sin(U.switching * 3.14159) * 0.85;
+  let q = vec2f(ndc.x * aspect - 0.03 - bobx,
+                (1.0 - U.hudTop - ndc.y) * 1.5 - 0.02 + drop - boby);
+  let ax = abs(q.x);
+  var c = vec3f(0.0);
+  var a = 0.0;
+  var lit = 0.0;     // 1 on a top edge, -1 on an underside
+
+  // The hand, common to all three: a glove around the grip with knuckles.
+  let hand = q.y < 0.20 && ax < 0.135 - q.y * 0.18;
+  if (hand) {
+    c = mix(vec3f(0.20, 0.15, 0.13), vec3f(0.32, 0.24, 0.19), q.y * 3.0);
+    a = 1.0;
+    if (fract(q.x * 9.0) < 0.42 && q.y > 0.10 && q.y < 0.17) { c = c * 1.25; }
+  }
+
+  if (which == 1) {
+    // Shotgun: wide receiver, twin barrels, a pump slung under them.
+    if (q.y >= 0.16 && q.y < 0.40 && ax < 0.135) {
+      c = vec3f(0.24, 0.17, 0.11);                       // wooden stock
+      a = 1.0;
+      if (fract(q.y * 16.0) < 0.3) { c = c * 1.1; }      // grain
+      lit = select(-1.0, 1.0, q.y > 0.36);
+    }
+    if (q.y >= 0.28 && q.y < 0.38 && ax < 0.115) {       // pump
+      c = vec3f(0.15, 0.11, 0.08);
+      a = 1.0;
+    }
+    if (q.y >= 0.38 && q.y < 0.74 && ax < 0.09) {        // barrels
+      let split = smoothstep(0.010, 0.022, abs(ax - 0.045));
+      c = vec3f(0.30, 0.30, 0.33) * (0.5 + 0.5 * split);
+      a = 1.0;
+      lit = select(-1.0, 1.0, q.y > 0.70);
+    }
+    if (q.y > 0.72 && q.y < 0.76 && ax < 0.09) { c = vec3f(0.05, 0.05, 0.06); a = 1.0; }
+  } else if (which == 2) {
+    // Chaingun: heavy body, six barrels that spin while it is firing.
+    if (q.y >= 0.14 && q.y < 0.46 && ax < 0.19) {
+      c = vec3f(0.21, 0.21, 0.24);
+      a = 1.0;
+      if (ax > 0.15) { c = c * 0.8; }                    // side plates
+      lit = select(-1.0, 1.0, q.y > 0.42);
+    }
+    if (q.y >= 0.20 && q.y < 0.30 && ax < 0.21) {        // ammo feed
+      c = vec3f(0.30, 0.26, 0.14);
+      a = 1.0;
+      if (fract(q.x * 14.0) < 0.45) { c = vec3f(0.55, 0.47, 0.22); }   // rounds
+    }
+    if (q.y >= 0.44 && q.y < 0.70 && ax < 0.13) {        // barrel cluster
+      let spin = fract(q.x * 3.6 + U.time * 16.0 * step(0.05, U.gun));
+      c = vec3f(0.38, 0.38, 0.42) * (0.45 + 0.55 * step(0.45, spin));
+      a = 1.0;
+    }
+    if (q.y > 0.68 && q.y < 0.72 && ax < 0.13) { c = vec3f(0.05, 0.05, 0.06); a = 1.0; }
+  } else {
+    // Pistol: slide, frame, a front sight and an ejection port.
+    if (q.y >= 0.15 && q.y < 0.34 && ax < 0.10) {
+      c = vec3f(0.23, 0.22, 0.25);
+      a = 1.0;
+      lit = select(-1.0, 1.0, q.y > 0.30);
+    }
+    if (q.y >= 0.26 && q.y < 0.32 && q.x > 0.02 && q.x < 0.07) {       // ejection port
+      c = vec3f(0.08, 0.08, 0.09);
+    }
+    if (q.y >= 0.32 && q.y < 0.58 && ax < 0.040) {                     // barrel
+      c = vec3f(0.30, 0.29, 0.32);
+      a = 1.0;
+      lit = select(-1.0, 1.0, q.y > 0.54);
+    }
+    if (q.y >= 0.52 && q.y < 0.60 && ax < 0.062) { c = vec3f(0.19, 0.18, 0.20); a = 1.0; }
+    if (q.y >= 0.56 && q.y < 0.62 && ax < 0.016) { c = vec3f(0.42, 0.42, 0.46); a = 1.0; }  // sight
+    if (q.y > 0.58 && q.y < 0.61 && ax < 0.020) { c = vec3f(0.03, 0.03, 0.04); a = 1.0; }   // bore
+  }
+
+  // Lit from the left, plus the top and bottom edges picked out.
+  c = c * (1.22 - clamp((q.x + 0.12) * 2.0, 0.0, 0.8));
+  c = c * (1.0 + lit * 0.22);
+
+  // A shaped flash: a bright core with four spikes, rather than a blob.
+  let muzzleY = select(0.62, select(0.78, 0.74, which == 2), which >= 1);
+  let m = vec2f(q.x, q.y - muzzleY);
+  let r = length(m);
+  let spikes = 0.55 + 0.45 * abs(cos(atan2(m.y, m.x) * 2.0));
+  let glow = U.flash * exp(-r * 11.0) * spikes;
+  return vec4f(c + vec3f(1.0, 0.74, 0.30) * glow * 2.6, max(a, min(glow * 3.0, 1.0)));
+}
+
+// --- minimap ----------------------------------------------------------------
+
+// Drawn straight from the same bits the renderer walks, north up, with the
+// player fixed in the middle. Returns premultiplied colour and coverage.
+fn minimap(frag : vec2f) -> vec4f {
+  let size = min(150.0, U.res.x * 0.22);
+  let pad = 12.0;
+  let origin = vec2f(U.res.x - size - pad, pad);
+  let rel = frag - origin;
+  if (rel.x < 0.0 || rel.y < 0.0 || rel.x > size || rel.y > size) { return vec4f(0.0); }
+
+  let range = 15.0;                                  // cells from edge to edge
+  let uv = rel / size;
+  let world = U.cam + (uv - 0.5) * 2.0 * range;
+  let cell = vec2i(floor(world));
+
+  var col = vec3f(0.03, 0.03, 0.05);
+  var alpha = 0.55;
+  let border = min(min(rel.x, rel.y), min(size - rel.x, size - rel.y));
+  if (border < 2.0) { return vec4f(vec3f(0.35, 0.35, 0.40), 0.85); }
+
+  if (!outside(cell) && solid(cell)) {
+    if (bitOf(2, cell)) { col = vec3f(0.75, 0.65, 0.25); }
+    else if (bitOf(1, cell)) { col = vec3f(0.28, 0.30, 0.34); }
+    else { col = vec3f(0.50, 0.50, 0.56); }
+    alpha = 0.85;
+  }
+
+  // Everything that matters, as dots, in map units so they stay round.
+  let dotR = range / size * 3.0;
+  for (var i = 0u; i < 12u; i = i + 1u) {
+    let p = U.picks[i];
+    if (p.w < 0.0) { continue; }
+    if (length(p.xy - world) < dotR) {
+      col = select(vec3f(0.35, 0.85, 0.45), vec3f(0.95, 0.85, 0.30), p.z >= 5.0);
+      alpha = 1.0;
+    }
+  }
+  for (var i = 0u; i < 14u; i = i + 1u) {
+    let f = U.foes[i];
+    if (f.z <= 0.02) { continue; }
+    if (length(f.xy - world) < dotR) {
+      col = select(vec3f(0.90, 0.25, 0.20), vec3f(0.45, 0.85, 0.95), f.w >= 2.0);
+      alpha = 1.0;
+    }
+  }
+
+  // The player, with a wedge for the heading.
+  let toPlayer = world - U.cam;
+  let pd = length(toPlayer);
+  if (pd < dotR * 1.1) { return vec4f(vec3f(1.0), 1.0); }
+  if (pd < dotR * 3.4) {
+    let dir = vec2f(cos(U.ang), sin(U.ang));
+    if (dot(normalize(toPlayer), dir) > 0.86) { return vec4f(vec3f(0.9, 0.95, 1.0), 0.9); }
+  }
+  return vec4f(col, alpha);
+}
+
+@vertex
+fn vs(@builtin(vertex_index) i : u32) -> @builtin(position) vec4f {
+  // One oversized triangle covering the clip volume.
+  let p = vec2f(f32((i << 1u) & 2u) * 2.0 - 1.0, f32(i & 2u) * 2.0 - 1.0);
+  return vec4f(p, 0.0, 1.0);
+}
+
+@fragment
+fn fs(@builtin(position) frag : vec4f) -> @location(0) vec4f {
+  let aspect = U.res.x / U.res.y;
+  let shake = vec2f(U.shakeX, U.shakeY);
+  let ndc = frag.xy / U.res * 2.0 - 1.0 + shake;
+  let screenX = ndc.x * aspect * U.fov;
+  // Pitch is a shear, not a rotation: it slides the horizon instead of
+  // tilting the camera, which is what keeps the columns vertical. The walk
+  // cycle rides on the same value.
+  let bobY = sin(U.bob) * 0.012;
+  let bobX = cos(U.bob * 0.5) * 0.010;
+  // The wipe. Doom slid the outgoing screen downwards in ragged columns and
+  // let the incoming one show through the gap. That is what this does: the new
+  // level is drawn normally, and the frame from before the change slides down
+  // over it, column by column, each starting at its own moment and falling
+  // faster as it goes.
+  //
+  // Two earlier versions were wrong in ways worth remembering. Shearing the
+  // live scene distorted it and, since the value runs from covered to clear,
+  // made the picture rise into place rather than the old one fall off it.
+  // Replacing that with a black curtain removed the distortion but not the
+  // problem: a curtain that covers the screen is a black screen, so every
+  // transition began with a flash of black before anything appeared to melt.
+  let meltCol = floor(frag.x / 5.0);
+  let meltRnd = hash21(vec2f(meltCol, 3.0));
+  let meltPhase = max((1.0 - U.melt) * (1.15 + 0.55 * meltRnd) - 0.22 * meltRnd, 0.0);
+  let meltFall = meltPhase * meltPhase * U.res.y * 1.1;
+  let meltY = frag.y - meltFall;
+  // Sampled unconditionally: a texture read inside a branch is not allowed to
+  // pick its own mip level, and this shader has no mips to pick from anyway.
+  let meltOld = textureSampleLevel(snapTex, snapSmp,
+    vec2f(frag.x, clamp(meltY, 0.0, U.res.y - 1.0)) / U.res, 0.0).rgb;
+  let sy = ndc.y + U.pitch + bobY;
+
+  let dir = vec2f(cos(U.ang), sin(U.ang));
+  let plane = vec2f(-dir.y, dir.x);
+  let rd = dir + plane * screenX;
+
+  // --- DDA over the grid ---------------------------------------------------
+  // The ray walks the grid cell by cell, and at each one it asks two questions:
+  // is the floor of this cell visible at this pixel, and does the next cell put
+  // something vertical in the way. Floors are per cell because the world has
+  // height: a cell is not simply open or shut, it is open at an elevation, and
+  // the step between two elevations is a face the ray can hit.
+  var cell = vec2i(floor(U.cam));
+  let delta = abs(1.0 / rd);
+  var stepDir = vec2i(1, 1);
+  var sideDist = (vec2f(cell) + vec2f(1.0) - U.cam) * delta;
+  if (rd.x < 0.0) {
+    stepDir.x = -1;
+    sideDist.x = (U.cam.x - f32(cell.x)) * delta.x;
+  }
+  if (rd.y < 0.0) {
+    stepDir.y = -1;
+    sideDist.y = (U.cam.y - f32(cell.y)) * delta.y;
+  }
+
+  var side = 0;
+  var hit = 0;              // 0 nothing, 1 wall, 2 crate, 3 door, 4 floor, 5 step
+  var dist = 1e9;
+  var doorKey = -1.0;
+  var enter = 0.0;          // distance at which the ray entered this cell
+  var floorZ = groundAt(cell);   // elevation of the floor under the ray
+  var faceZ = 0.0;          // elevation of the bottom of whatever it hit
+  var hitCell = cell;
+
+  for (var i = 0; i < MAX_STEPS; i = i + 1) {
+    let leave = min(sideDist.x, sideDist.y);
+
+    // The floor of the cell the ray is crossing, if this pixel looks at it.
+    if (sy > 0.0005) {
+      let tf = (U.eyeZ - floorZ) * 2.0 * WALL_HEIGHT / sy;
+      if (tf >= enter && tf <= leave && tf > 0.02) {
+        dist = tf;
+        hit = 4;
+        faceZ = floorZ;
+        hitCell = cell;
+        break;
+      }
+    }
+
+    if (sideDist.x < sideDist.y) {
+      sideDist.x = sideDist.x + delta.x;
+      cell.x = cell.x + stepDir.x;
+      side = 0;
+    } else {
+      sideDist.y = sideDist.y + delta.y;
+      cell.y = cell.y + stepDir.y;
+      side = 1;
+    }
+    enter = leave;
+
+    if (outside(cell)) { dist = enter; hit = 1; faceZ = floorZ; hitCell = cell; break; }
+
+    if (solid(cell)) {
+      // Doors hang from the ceiling and slide up, so the gap opens underneath.
+      if (bitOf(2, cell)) {
+        let d = doorAt(cell);
+        let bottom = (U.eyeZ - (groundAt(cell) + d.x)) * 2.0 * WALL_HEIGHT / enter;
+        let top = (U.eyeZ - 1.0) * 2.0 * WALL_HEIGHT / enter;
+        if (sy <= bottom && sy >= top) {
+          dist = enter; hit = 3; doorKey = d.y; faceZ = groundAt(cell); hitCell = cell;
+          break;
+        }
+        // Above the leaf there is only ceiling, and the door blocks the rest.
+        if (sy < top) { hit = 0; break; }
+        continue;                                  // under the open gap
+      }
+      // A crate is a short face with a walkable top, so the ray either meets
+      // its side or passes over it and carries on at the new elevation.
+      if (bitOf(1, cell)) {
+        let cz = groundAt(cell);
+        let top = (U.eyeZ - (cz + LOW_H)) * 2.0 * WALL_HEIGHT / enter;
+        let bottom = (U.eyeZ - cz) * 2.0 * WALL_HEIGHT / enter;
+        if (sy >= top && sy <= bottom) {
+          dist = enter; hit = 2; faceZ = cz; hitCell = cell;
+          break;
+        }
+        floorZ = cz + LOW_H;
+        continue;
+      }
+      // A full wall runs from its own floor up to the ceiling. The pixel has
+      // to be inside that span: without this check every ray entering a solid
+      // cell reports a wall no matter how far above its top edge it is
+      // looking, and distant walls smear over the whole upper screen.
+      let topSy = (U.eyeZ - 1.0) * 2.0 * WALL_HEIGHT / enter;
+      if (sy >= topSy) {
+        dist = enter; hit = 1; faceZ = floorZ; hitCell = cell;
+      } else {
+        hit = 0;                                   // ceiling, in front of it
+      }
+      break;
+    }
+
+    // Open ground. A step up shows its riser; a step down shows nothing from
+    // this side, because that face points away from the eye.
+    let nextZ = groundAt(cell);
+    if (nextZ > floorZ) {
+      let top = (U.eyeZ - nextZ) * 2.0 * WALL_HEIGHT / enter;
+      let bottom = (U.eyeZ - floorZ) * 2.0 * WALL_HEIGHT / enter;
+      if (sy >= top && sy <= bottom) {
+        dist = enter; hit = 5; faceZ = floorZ; hitCell = cell;
+        break;
+      }
+    }
+    floorZ = nextZ;
+  }
+
+  dist = max(dist, 0.0001);
+
+  var color : vec3f;
+  if (hit == 4) {
+    // --- a floor, at whatever elevation this cell sits ---
+    let pt = U.cam + rd * dist;
+    let lift = faceZ / STEP_H;          // 0 on the ground, 1..3 on a platform
+    var base = groundTex(pt, false);
+    if (lift > 0.5) {
+      // Raised ground is a different material, so a step reads as a step.
+      base = mix(base, vec3f(0.30, 0.27, 0.22) * (0.7 + 0.16 * lift), 0.55);
+    }
+    color = mix(base, vec3f(0.24, 0.23, 0.26), smoothstep(7.0, 20.0, dist));
+  } else if (hit == 0) {
+    // --- nothing but ceiling ---
+    let gd = (1.0 - U.eyeZ) * 2.0 * WALL_HEIGHT / max(-sy, 0.001);
+    let pt = U.cam + rd * gd;
+    color = mix(groundTex(pt, true), vec3f(0.13, 0.13, 0.15), smoothstep(7.0, 20.0, gd));
+    dist = gd;
+  } else {
+    // --- a vertical face: wall, crate, door or the riser of a step ---
+    var n : vec3f;
+    if (side == 0) {
+      n = vec3f(-f32(stepDir.x), 0.0, 0.0);
+    } else {
+      n = vec3f(0.0, 0.0, -f32(stepDir.y));
+    }
+    let lambert = 0.45 + 0.55 * max(dot(n, normalize(SUN)), 0.0);
+    let hitPos = U.cam + rd * dist;
+    let along = select(hitPos.x, hitPos.y, side == 0);
+    // Height up the face, measured from its own foot.
+    let span = select(1.0 - faceZ, select(LOW_H, STEP_H, hit == 5), hit != 1);
+    let footSy = (U.eyeZ - faceZ) * 2.0 * WALL_HEIGHT / dist;
+    let topSy = (U.eyeZ - faceZ - span) * 2.0 * WALL_HEIGHT / dist;
+    let height = clamp((footSy - sy) / max(footSy - topSy, 0.0001), 0.0, 1.0);
+
+    if (hit == 2) {
+      color = crateTex(hitCell, vec2f(along, height)) * lambert;
+      if (height > 0.88) { color = color * 1.4; }
+    } else if (hit == 3) {
+      color = doorTex(vec2f(along, height), doorKey) * lambert;
+    } else if (hit == 5) {
+      // The riser of a step: banded stone, brighter along its lip.
+      let band = crateTex(hitCell, vec2f(along, height));
+      color = mix(wallTex(hitCell, vec2f(along, height * 0.4)), band, 0.25) * lambert;
+      if (height > 0.8) { color = color * 1.45; }
+    } else {
+      color = wallTex(hitCell, vec2f(along, height)) * lambert;
+    }
+  }
+
+  let halfHeight = WALL_HEIGHT / dist;
+
+  // The muzzle flash is the one dynamic light in the game: a brief burst at the
+  // camera, falling off with distance, which is why firing lights up a corridor.
+  color = color * (1.0 + U.flash * 2.2 * exp(-dist * 0.45));
+
+  // --- enemies -------------------------------------------------------------
+  // Each one is a vertical cylinder. The ray hits it if it passes within
+  // FOE_R of the axis; the nearest sprite that actually covers this pixel
+  // wins against the wall and against the others.
+  let rn = normalize(rd);
+  let tangent = vec2f(-rn.y, rn.x);
+  let fwd = dot(rn, dir);
+  for (var i = 0u; i < 14u; i = i + 1u) {
+    let foe = U.foes[i];
+    if (foe.z <= 0.02) { continue; }
+    let rel = foe.xy - U.cam;
+    let along = dot(rel, rn);
+    if (along <= 0.1) { continue; }
+    let off = dot(rel, tangent);
+    let kindR = select(FOE_R, FOE_R * 1.45, foe.w >= 4.0);
+    if (abs(off) > kindR) { continue; }
+    let fdepth = along * fwd;
+    if (fdepth >= dist) { continue; }
+    // Feet sit on the floor line; z shrinks the sprite as the body sinks.
+    // Enemies stand on the floor of the cell they are in, which may be a step.
+    let foeZ = groundAt(vec2i(floor(foe.xy)));
+    let floorLine = (U.eyeZ - foeZ) * 2.0 * WALL_HEIGHT / fdepth;
+    let v = (floorLine - sy) / (2.0 * WALL_HEIGHT * SPRITE_H * foe.z / fdepth);
+    if (v < 0.0 || v > 1.0) { continue; }
+    let kind = floor(foe.w * 0.25);
+    let rest = foe.w - kind * 4.0;
+    let walking = rest >= 2.0;
+    let hurt = rest - select(0.0, 2.0, walking);
+    // Each one animates on its own clock so a pack does not march in step.
+    let gait = select(0.0, 1.0, walking) * sin(U.time * 7.0 + f32(i) * 2.1);
+    let idle = sin(U.time * 1.7 + f32(i));
+    let uu = off / kindR;
+    var s : vec4f;
+    if (kind > 1.5) { s = bruteShape(uu, v, hurt, gait, idle); }
+    else if (kind > 0.5) { s = casterShape(uu, v, hurt, U.time + f32(i), idle); }
+    else { s = impShape(uu, v, hurt, gait, idle); }
+    if (s.a > 0.5) {
+      color = s.rgb * (1.0 + U.flash * 1.6 * exp(-fdepth * 0.45));
+      dist = fdepth;
+    }
+  }
+
+  // --- pickups -------------------------------------------------------------
+  for (var i = 0u; i < 12u; i = i + 1u) {
+    let p = U.picks[i];
+    if (p.w < 0.0) { continue; }                     // taken
+    let rel = p.xy - U.cam;
+    let along = dot(rel, rn);
+    if (along <= 0.1) { continue; }
+    let off = dot(rel, tangent);
+    if (abs(off) > PICK_R) { continue; }
+    let pdepth = along * fwd;
+    if (pdepth >= dist) { continue; }
+    // Bobbing up and down off the floor.
+    let base = groundAt(vec2i(floor(p.xy))) + 0.10 + 0.045 * sin(U.time * 2.2 + p.w);
+    let bottom = (U.eyeZ - base) * 2.0 * WALL_HEIGHT / pdepth;
+    let top = (U.eyeZ - base - PICK_H) * 2.0 * WALL_HEIGHT / pdepth;
+    let v = (bottom - sy) / (bottom - top);
+    if (v < 0.0 || v > 1.0) { continue; }
+    let s = pickShape(off / PICK_R, v, i32(p.z + 0.5));
+    if (s.a > 0.5) {
+      // Pickups are lit from within, so they stay findable in a dark corner.
+      color = s.rgb * (0.75 + 0.45 * exp(-pdepth * FOG));
+      dist = pdepth;
+    }
+  }
+
+  // The way out. A column of light, bright enough to navigate towards, pulsing
+  // so it reads as a thing rather than a lit wall.
+  {
+    let rel = vec2f(U.exitX, U.exitY) - U.cam;
+    let along = dot(rel, rn);
+    if (along > 0.1) {
+      let off = dot(rel, tangent);
+      let edepth = along * fwd;
+      if (abs(off) < 0.42 && edepth < dist) {
+        let floorLine = WALL_HEIGHT / edepth;
+        let v = (floorLine - sy) / (2.0 * WALL_HEIGHT * 0.95 / edepth);
+        if (v >= 0.0 && v <= 1.0) {
+          let u = off / 0.42;
+          // An arch: two posts and a lintel, filled with moving light.
+          let post = abs(abs(u) - 0.82) < 0.18 && v < 0.92;
+          let top = v > 0.82 && abs(u) < 1.0;
+          let inner = abs(u) < 0.66 && v < 0.86;
+          if (post || top) {
+            color = vec3f(0.62, 0.58, 0.50) * (0.7 + 0.3 * v);
+            dist = edepth;
+          } else if (inner) {
+            let glow = 0.55 + 0.45 * sin(U.time * 3.0 - v * 7.0);
+            color = mix(vec3f(0.15, 0.85, 0.55), vec3f(0.75, 1.0, 0.85), glow * v);
+            dist = edepth;
+          }
+        }
+      }
+    }
+  }
+
+  // Fog, applied to everything solid before the glowing things are added on top.
+  color = color * exp(-dist * FOG);
+
+  // --- fireballs and particles ---------------------------------------------
+  // Both are additive point sprites tested against the depth already resolved,
+  // so they are hidden by walls but are not themselves fogged into nothing.
+  for (var i = 0u; i < 10u; i = i + 1u) {
+    let s = U.shots[i];
+    if (s.w <= 0.0) { continue; }
+    let rel = s.xy - U.cam;
+    let depth = dot(rel, dir);
+    if (depth <= 0.15 || depth >= dist) { continue; }
+    let px = dot(rel, plane) / depth;
+    let py = (U.eyeZ - 0.5 - groundAt(vec2i(floor(s.xy)))) * 2.0 * WALL_HEIGHT / depth;
+    let dx = (screenX - px) / (SHOT_R / depth);
+    let dy = (sy - py) / (2.0 * WALL_HEIGHT * SHOT_R / depth);
+    let r2 = dx * dx + dy * dy;
+    if (r2 > 4.0) { continue; }
+    let core = exp(-r2 * 2.2);
+    color = color + vec3f(0.35, 1.05, 1.35) * core * 1.6;
+  }
+
+  for (var i = 0u; i < 40u; i = i + 1u) {
+    let p = U.parts[i];
+    if (p.w <= 0.0) { continue; }
+    let kind = floor(p.w);
+    let life = p.w - kind;
+    let rel = p.xy - U.cam;
+    let depth = dot(rel, dir);
+    if (depth <= 0.15 || depth >= dist) { continue; }
+    let px = dot(rel, plane) / depth;
+    let py = (U.eyeZ - p.z) * 2.0 * WALL_HEIGHT / depth;
+    let size = select(0.035, 0.075, kind == 2.0) * (1.0 + (1.0 - life));
+    let dx = (screenX - px) / (size / depth);
+    let dy = (sy - py) / (2.0 * WALL_HEIGHT * size / depth);
+    let r2 = dx * dx + dy * dy;
+    if (r2 > 1.0) { continue; }
+    var tint = vec3f(0.65, 0.06, 0.05);              // blood
+    if (kind == 1.0) { tint = vec3f(1.0, 0.75, 0.30); }     // spark
+    else if (kind == 2.0) { tint = vec3f(0.22, 0.22, 0.26); }  // smoke
+    else if (kind == 3.0) { tint = vec3f(0.35, 1.0, 1.2); }    // ember
+    let soft = (1.0 - r2) * life;
+    if (kind == 0.0) {
+      color = mix(color, tint, soft);                // blood is not emissive
+    } else {
+      color = color + tint * soft * 1.3;
+    }
+  }
+
+  // --- gun and full-screen effects ------------------------------------------
+  let g = weapon(ndc, aspect, bobX, bobY * 1.6);
+  color = mix(color, g.rgb, g.a);
+  color = color + vec3f(0.30, 0.22, 0.10) * U.flash * 0.22;
+  color = mix(color, vec3f(0.55, 0.03, 0.02), U.hurt * 0.5);
+
+  // Damage from off screen shows as a glow on the side it came from.
+  if (U.hurt > 0.01) {
+    let edge = smoothstep(0.35, 1.0, length(ndc));
+    let bearing = atan2(ndc.y, ndc.x * aspect);
+    let toward = cos(bearing - U.hurtDir);
+    color = color + vec3f(0.7, 0.05, 0.05) * edge * max(toward, 0.0) * U.hurt * 0.8;
+  }
+
+  color = mix(color, vec3f(0.14, 0.0, 0.0), U.dead);
+
+  // Crosshair, on the exact centre ray the shot is fired down.
+  let cross = abs((ndc - shake) * vec2f(aspect, 1.0));
+  if (max(cross.x, cross.y) < 0.014 && min(cross.x, cross.y) < 0.0018) {
+    color = color + vec3f(0.45, 0.5, 0.45) * (1.0 - U.dead);
+  }
+
+  // Cheap gamma so the dark end does not crush.
+  var outColor = pow(max(color, vec3f(0.0)), vec3f(1.0 / 1.6));
+  // Wherever the outgoing frame has not yet slid past, show it instead. It is
+  // already gamma encoded, so it goes in after the conversion above.
+  if (U.melt > 0.0 && meltY >= 0.0) { outColor = meltOld; }
+
+  let mm = minimap(frag.xy);
+  outColor = mix(outColor, mm.rgb, mm.a * (1.0 - U.dead * 0.7));
+
+  return vec4f(outColor, 1.0);
+}
+`;
+
+// ---------------------------------------------------------------------------
+// WebGPU setup.
+// ---------------------------------------------------------------------------
+
+function fail(msg) {
+  const el = document.createElement("div");
+  el.id = "err";
+  el.textContent = msg;
+  document.body.appendChild(el);
+  console.error(msg);
+}
+
+async function main() {
+  if (!navigator.gpu) return fail("WebGPU not available. Use Chrome or Edge.");
+
+  const adapter = await navigator.gpu.requestAdapter();
+  if (!adapter) return fail("No WebGPU adapter.");
+  const device = await adapter.requestDevice();
+  device.addEventListener("uncapturederror", (e) => fail(String(e.error)));
+
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("webgpu");
+  const format = navigator.gpu.getPreferredCanvasFormat();
+  // COPY_SRC so each finished frame can be kept for the wipe to slide.
+  ctx.configure({ device, format, alphaMode: "opaque",
+                  usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
+
+  const module = device.createShaderModule({ code: SHADER });
+  const info = await module.getCompilationInfo();
+  for (const m of info.messages) {
+    console[m.type === "error" ? "error" : "warn"](
+      "WGSL " + m.type + " line " + m.lineNum + ": " + m.message);
+  }
+
+  const pipeline = device.createRenderPipeline({
+    layout: "auto",
+    vertex: { module, entryPoint: "vs" },
+    fragment: { module, entryPoint: "fs", targets: [{ format }] },
+    primitive: { topology: "triangle-list" },
+  });
+
+  // Uniform layout, in floats. Every array is 16 byte aligned, which the
+  // offsets below satisfy, and matches the struct at the top of the shader.
+  //
+  // Every offset is a multiple of four floats, which is the sixteen byte
+  // alignment WGSL gives an array of vec4. The header is padded out to 32 for
+  // the same reason rather than left to land wherever it lands.
+  //
+  //   0    header, 32 floats
+  //   32   solid bit plane, 128 words
+  //   160  low bit plane, 128 words
+  //   288  door bit plane, 128 words
+  //   416  floor height, low bit, 128 words
+  //   544  floor height, high bit, 128 words
+  //   672  foes,    14 * vec4
+  //   728  doors,    8 * vec4
+  //   760  pickups, 12 * vec4
+  //   808  shots,   10 * vec4
+  //   848  parts,   40 * vec4
+  //   1008 decals,  16 * vec4
+  const O_SOLID = 32, O_LOW = 160, O_DOOR = 288, O_HGT0 = 416, O_HGT1 = 544,
+        O_FOES = 672, O_DOORS = 728, O_PICKS = 760, O_SHOTS = 808, O_PARTS = 848,
+        O_DECALS = 1008, U_FLOATS = 1072;
+  const uniformData = new ArrayBuffer(U_FLOATS * 4);
+  const uf = new Float32Array(uniformData);
+  const uu = new Uint32Array(uniformData);
+
+  const uniformBuffer = device.createBuffer({
+    size: uniformData.byteLength,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
+
+  const sampler = device.createSampler({ magFilter: "linear", minFilter: "linear" });
+  let snapshot = null;
+  let bindGroup = null;
+
+  function resize() {
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    canvas.width = Math.max(1, Math.floor(canvas.clientWidth * dpr));
+    canvas.height = Math.max(1, Math.floor(canvas.clientHeight * dpr));
+    if (snapshot) snapshot.destroy();
+    snapshot = device.createTexture({
+      size: [canvas.width, canvas.height],
+      format,
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+    bindGroup = device.createBindGroup({
+      layout: pipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: uniformBuffer } },
+        { binding: 1, resource: snapshot.createView() },
+        { binding: 2, resource: sampler },
+      ],
+    });
+  }
+  addEventListener("resize", resize);
+  resize();
+
+  bindUi(canvas);
+  loadSettings();
+  restart(false);
+  setState(S_MENU);
+
+  // Writes a fixed size slot array into the uniform buffer, zero filling the
+  // slots that have nothing in them so the shader can skip them.
+  function writeSlots(offset, count, list, fill) {
+    for (let i = 0; i < count; i++) {
+      const o = offset + i * 4;
+      if (i < list.length) fill(o, list[i]);
+      // Zero in the third channel and negative in the fourth both mean empty,
+      // depending on which the shader checks for that array.
+      else { uf[o] = 0; uf[o + 1] = 0; uf[o + 2] = 0; uf[o + 3] = -1; }
+    }
+  }
+
+  let last = performance.now();
+  function frame(t) {
+    if (canvas.width !== Math.floor(canvas.clientWidth * Math.min(devicePixelRatio || 1, 2))) resize();
+
+    const dt = Math.min((t - last) * 0.001, 0.1);   // clamp so an alt-tab does not teleport
+    last = t;
+
+    // Everything except PLAY freezes the world but still draws it, so a menu
+    // sits over a live looking level rather than a black screen.
+    if (state === S_PLAY) {
+      update(dt);
+      buildFlow();
+      updateArena();
+      updateFoes(dt);
+      updateShots(dt);
+      updatePickups(dt);
+      updateDoors(dt);
+    }
+    if (state === S_PLAY || state === S_DEAD) {
+      updateEffects(dt);
+      updateParts(dt);
+    }
+
+    // The wipe advances in every state, including the menu. Tying it to the
+    // states that update the world left it stuck at fully covered on any screen
+    // that does not.
+    player.melt = Math.max(0, player.melt - dt * 0.8);
+
+    const time = t * 0.001;
+    const shake = player.shake * player.shake * 0.06;
+    uf[0] = canvas.width;
+    uf[1] = canvas.height;
+    uf[2] = camera.fov;
+    uf[3] = time;
+    uf[4] = camera.x;
+    uf[5] = camera.y;
+    uf[6] = camera.angle;
+    uf[7] = camera.pitch;
+    uf[8] = player.gun;
+    uf[9] = player.flash;
+    uf[10] = player.hurt;
+    uf[11] = player.dead;
+    uf[12] = player.bob;
+    uf[13] = Math.sin(time * 47.0) * shake;
+    uf[14] = Math.cos(time * 39.0) * shake;
+    // The status bar covers the bottom of the viewport; tell the shader how
+    // much, so the gun is drawn above it rather than behind it.
+    uf[15] = state === S_MENU ? 0 : (78 * (devicePixelRatio || 1) / canvas.height) * 2;
+    uf[16] = player.z + 0.5;      // eye height above the world floor
+    uf[17] = player.weapon;
+    uf[18] = player.hurtDir;
+    uf[19] = player.shake;
+    uf[20] = (player.keys[0] ? 1 : 0) + (player.keys[1] ? 2 : 0);
+    uf[21] = exitAt[0];
+    uf[22] = exitAt[1];
+    uf[23] = player.melt;
+    uf[24] = player.switching;
+    // floats 25 to 31 are padding
+
+    // Copied every frame, not once: restarting rebuilds the level in place, and
+    // a stale copy here means a world with no walls in it.
+    uu.set(SOLID, O_SOLID);
+    uu.set(LOW, O_LOW);
+    uu.set(DOORBIT, O_DOOR);
+    uu.set(HGT0, O_HGT0);
+    uu.set(HGT1, O_HGT1);
+
+    writeSlots(O_FOES, MAX_FOES, foes, (o, f) => {
+      uf[o] = f.x;
+      uf[o + 1] = f.y;
+      uf[o + 2] = f.hp > 0 ? 1 : f.fade;
+      // hurt in the fraction, kind in the whole number, so one channel carries
+      // both and the sprite array stays at four floats per enemy.
+      // kind * 4 + walking * 2 + hit flash, unpacked in the shader.
+      uf[o + 3] = Math.min(f.hurt, 0.99) + (f.walking ? 2 : 0) + FOE_INDEX[f.kind] * 4;
+    });
+    writeSlots(O_DOORS, MAX_DOORS, doors, (o, d) => {
+      uf[o] = d.cx;
+      uf[o + 1] = d.cy;
+      uf[o + 2] = d.open;
+      uf[o + 3] = d.key;
+    });
+    writeSlots(O_PICKS, MAX_PICKUPS, pickups, (o, p) => {
+      uf[o] = p.x;
+      uf[o + 1] = p.y;
+      uf[o + 2] = p.kind;
+      uf[o + 3] = p.taken ? -1 : p.bob;
+    });
+    writeSlots(O_SHOTS, MAX_SHOTS, shots, (o, s) => {
+      uf[o] = s.x;
+      uf[o + 1] = s.y;
+      uf[o + 2] = 0;
+      uf[o + 3] = Math.max(s.life, 0.01);
+    });
+    writeSlots(O_PARTS, MAX_PARTS, parts, (o, p) => {
+      uf[o] = p.x;
+      uf[o + 1] = p.y;
+      uf[o + 2] = p.z;
+      uf[o + 3] = p.kind + Math.min(Math.max(p.life, 0.01), 0.99);
+    });
+    writeSlots(O_DECALS, MAX_DECALS, decals, (o, d) => {
+      uf[o] = d.x;
+      uf[o + 1] = d.y;
+      uf[o + 2] = d.r;
+      uf[o + 3] = 0;
+    });
+
+    device.queue.writeBuffer(uniformBuffer, 0, uniformData);
+
+    const encoder = device.createCommandEncoder();
+    const view = { texture: ctx.getCurrentTexture() };
+    const pass = encoder.beginRenderPass({
+      colorAttachments: [{
+        view: view.texture.createView(),
+        clearValue: { r: 0, g: 0, b: 0, a: 1 },
+        loadOp: "clear",
+        storeOp: "store",
+      }],
+    });
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, bindGroup);
+    pass.draw(3);
+    pass.end();
+    if (player.melt <= 0) {
+      encoder.copyTextureToTexture({ texture: view.texture }, { texture: snapshot },
+                                   [canvas.width, canvas.height]);
+    }
+    device.queue.submit([encoder.finish()]);
+
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  console.log("umbra: running");
+}
+
+main().catch((e) => fail(String(e && e.stack || e)));
+
+</script>
+</body>
+</html>

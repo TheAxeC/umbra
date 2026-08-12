@@ -1,0 +1,436 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>umbra shader scenarios</title>
+<style>
+ body { margin:0; background:#111; color:#aaa; font:12px monospace; }
+ div.card { display:inline-block; margin:6px; }
+ canvas { display:block; width:460px; height:288px; }
+ pre { color:#7c7; margin:2px 0 0 0; font:11px monospace; }
+</style>
+</head>
+<body>
+<script type="module">
+// Checks for the half of the game that Node cannot see: the shader.
+//
+// Serve the repository and open http://localhost:8000/test/shader.html
+//
+// Three things this does that a screenshot cannot:
+//
+//   1. Renders on demand instead of in a frame loop. requestAnimationFrame does
+//      not fire in a backgrounded or occluded tab, which is how this machine
+//      reports its browser, so a conventional harness would render nothing. A
+//      render pass submitted directly has no such requirement.
+//   2. Reads the pixels back. The output goes to a texture that is copied into
+//      a mapped buffer, so brightness comes out as a number rather than an
+//      impression. Judging it from a screenshot does not work: the surrounding
+//      page affects the perception, and JPEG compression alters the values.
+//   3. Compares the minified shader against the original, pixel for pixel. That
+//      is what makes the WGSL minifier in the packer safe to touch.
+//
+// The uniform buffer is built by hand here, so the layout below has to match
+// the one in index.html. A mismatch shows up as scenarios rendering as garbage,
+// which is loud enough to notice but worth stating: if the shader gains a
+// field, the offsets here need updating too.
+import { minifyWgsl, renameWgsl } from "../build/wgsl-min.mjs";
+const src = await (await fetch("../index.html")).text();
+const m = src.match(/const SHADER = `([\s\S]*?)`;/);
+if (!m) throw new Error("could not extract SHADER");
+const code = m[1];
+
+// Float offsets into the uniform buffer, mirroring index.html.
+const O_SOLID = 32, O_LOW = 160, O_DOOR = 288, O_HGT0 = 416, O_HGT1 = 544,
+      O_FOES = 672, O_DOORS = 728, O_PICKS = 760, O_SHOTS = 808, O_PARTS = 848,
+      O_DECALS = 1008, U_FLOATS = 1072;
+const MAX = { foes: 14, doors: 8, picks: 12, shots: 10, parts: 40, decals: 16 };
+const SIZE = 64, WORDS = SIZE * 2;
+const W = 920, H = 576;
+
+// Maps for the synthetic scenarios, in the same two-words-per-row layout the
+// game uses. Built here rather than taken from the generator so that a scenario
+// can put a wall, a door or a block in an exact place and check what happens.
+function blank() {
+  const map = new Uint32Array(WORDS);
+  map.fill(0xffffffff);
+  return map;
+}
+const set = (map, x, y) => { map[y * 2 + (x >> 5)] |= (1 << (x & 31)); };
+const clear = (map, x, y) => { map[y * 2 + (x >> 5)] &= ~(1 << (x & 31)); };
+function room(x0, y0, x1, y1, map = blank()) {
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) clear(map, x, y);
+  return map;
+}
+
+// A hall with a corridor out of it, a run of waist high cover, and a doorway
+// where the corridor begins.
+const HALL = room(2, 2, 15, 15);
+room(16, 8, 44, 9, HALL);
+const HALL_LOW = new Uint32Array(WORDS);
+for (let x = 6; x <= 9; x++) { set(HALL, x, 12); set(HALL_LOW, x, 12); }
+const HALL_DOOR = new Uint32Array(WORDS);
+set(HALL, 16, 8);
+set(HALL_DOOR, 16, 8);
+const HALL_H0 = new Uint32Array(WORDS);
+const HALL_H1 = new Uint32Array(WORDS);
+// Steps rising to the east, then a platform two steps up.
+for (let y = 3; y <= 13; y++) {
+  set(HALL_H0, 11, y);                       // level 1
+  set(HALL_H1, 12, y);                       // level 2
+  set(HALL_H0, 13, y); set(HALL_H1, 13, y);  // level 3
+  set(HALL_H0, 14, y); set(HALL_H1, 14, y);
+}
+const HALL_LEVEL = { solid: HALL, low: HALL_LOW, door: HALL_DOOR, h0: HALL_H0, h1: HALL_H1 };
+
+const adapter = await navigator.gpu.requestAdapter();
+const device = await adapter.requestDevice();
+const format = navigator.gpu.getPreferredCanvasFormat();
+const module = device.createShaderModule({ code });
+for (const msg of (await module.getCompilationInfo()).messages) {
+  console.log("WGSL " + msg.type + " line " + msg.lineNum + ": " + msg.message);
+}
+
+// Two pipelines over the same module. The canvas format is whatever the
+// platform prefers, usually bgra8unorm, while readback needs a fixed known
+// format so the byte order of the mapped buffer is not a guess.
+const pipelineFormat = new Map();
+function makePipeline(mod, target) {
+  const pipe = device.createRenderPipeline({
+    layout: "auto",
+    vertex: { module: mod, entryPoint: "vs" },
+    fragment: { module: mod, entryPoint: "fs", targets: [{ format: target }] },
+    primitive: { topology: "triangle-list" },
+  });
+  pipelineFormat.set(pipe, target);
+  return pipe;
+}
+const pipeline = makePipeline(module, format);
+const readPipeline = makePipeline(module, "rgba8unorm");
+
+// The shader samples the frame from before a scene change so the wipe has
+// something to slide. Here that is an unmistakable striped pattern: if a
+// melt scenario shows these stripes sliding down over the level, the mechanism
+// works; if it shows black, the binding is wrong.
+const SNAP_W = 64, SNAP_H = 64;
+function makeSnapshot(fmt) {
+  const tex = device.createTexture({ size: [SNAP_W, SNAP_H], format: fmt,
+    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
+  const px = new Uint8Array(SNAP_W * SNAP_H * 4);
+  for (let y = 0; y < SNAP_H; y++) {
+    for (let x = 0; x < SNAP_W; x++) {
+      const o = (y * SNAP_W + x) * 4;
+      const band = (y >> 3) & 1;
+      px[o] = band ? 220 : 30;
+      px[o + 1] = 30;
+      px[o + 2] = band ? 40 : 200;
+      px[o + 3] = 255;
+    }
+  }
+  device.queue.writeTexture({ texture: tex }, px,
+    { bytesPerRow: SNAP_W * 4, rowsPerImage: SNAP_H }, [SNAP_W, SNAP_H]);
+  return tex;
+}
+const snapCanvas = makeSnapshot(format);
+const snapRead = makeSnapshot("rgba8unorm");
+const sampler = device.createSampler({ magFilter: "linear", minFilter: "linear" });
+
+// Run the real generator, so the first scenarios show the level the player
+// actually spawns into rather than a hand-built room.
+const logicBlock = src.slice(src.indexOf("const MAP_SIZE"), src.indexOf("// Shader. Fullscreen triangle"));
+const logic = new Function(logicBlock + `
+  return { SOLID, LOW, DOORBIT, HGT0, HGT1, buildLevel, START, FOE_SPAWNS, BASE_SEED, solidAt,
+           getDoors: () => doors, getPickups: () => pickups, setLevel: (n) => { level = n; } };`)();
+logic.setLevel(2);
+logic.buildLevel(logic.BASE_SEED + 2);
+const LEVEL = {
+  solid: Uint32Array.from(logic.SOLID),
+  low: Uint32Array.from(logic.LOW),
+  door: Uint32Array.from(logic.DOORBIT),
+  h0: Uint32Array.from(logic.HGT0),
+  h1: Uint32Array.from(logic.HGT1),
+};
+const SPAWN = [logic.START[0], logic.START[1]];
+const LEVEL_FOES = logic.FOE_SPAWNS.slice(0, MAX.foes)
+  .map(([x, y, kind]) => [x, y, 1, kind === "caster" ? 2 : 0]);
+const LEVEL_PICKS = logic.getPickups().slice(0, MAX.picks).map((p) => [p.x, p.y, p.kind, p.bob]);
+const LEVEL_DOORS = logic.getDoors().slice(0, MAX.doors).map((d) => [d.cx, d.cy, d.open, d.key]);
+let openCount = 0;
+for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) if (!logic.solidAt(x, y)) openCount++;
+console.log("real level: start " + SPAWN + ", open " + openCount + "/" + SIZE * SIZE +
+            ", foes " + LEVEL_FOES.length + ", pickups " + LEVEL_PICKS.length +
+            ", doors " + LEVEL_DOORS.length);
+
+const scenarios = [
+  { label: "real level, facing +x", cam: SPAWN, ang: 0, level: LEVEL,
+    foes: LEVEL_FOES, picks: LEVEL_PICKS, doors: LEVEL_DOORS },
+  { label: "real level, facing -x", cam: SPAWN, ang: Math.PI, level: LEVEL,
+    foes: LEVEL_FOES, picks: LEVEL_PICKS, doors: LEVEL_DOORS },
+  { label: "imp and caster down the hall", cam: [5, 8.5], ang: 0,
+    foes: [[11, 8.5, 1, 0], [20, 8.5, 1, 2]] },
+  { label: "cover: seen over, walked into", cam: [7.5, 6.0], ang: Math.PI / 2,
+    foes: [[7.5, 14.0, 1, 0]] },
+  { label: "door half open", cam: [10, 8.5], ang: 0, doors: [[16, 8, 0.45, -1]] },
+  { label: "locked door, blue", cam: [10, 8.5], ang: 0, doors: [[16, 8, 0.0, 1]] },
+  { label: "pickups on the floor", cam: [5, 8.5], ang: 0,
+    picks: [[8, 7.7, 0, 0], [9, 8.5, 1, 1], [10.5, 9.3, 3, 2], [12, 8.5, 5, 3]] },
+  { label: "fireballs and particles", cam: [5, 8.5], ang: 0,
+    shots: [[9, 8.5, 0, 1], [13, 8.2, 0, 1]],
+    parts: Array.from({ length: 20 },
+      (_, i) => [8 + i * 0.12, 8.2 + (i % 5) * 0.12, 0.25 + (i % 4) * 0.2, (i % 4) + 0.8]) },
+  { label: "shotgun, firing", cam: [5, 8.5], ang: 0, weapon: 1, gun: 1.6, flash: 1,
+    foes: [[10, 8.5, 1, 0]] },
+  { label: "chaingun, hurt and shaken", cam: [5, 8.5], ang: 0, weapon: 2, gun: 0.6,
+    hurt: 0.9, hurtDir: 2.4, shake: 0.8, shakeX: 0.02, shakeY: -0.01,
+    foes: [[10, 8.5, 1, 0]] },
+  { label: "dying", cam: [5, 8.5], ang: 0, pitch: -0.35, dead: 0.75, hurt: 0.4,
+    foes: [[9, 8.5, 1, 0]] },
+  { label: "the brute", cam: [5, 8.5], ang: 0, foes: [[10, 8.5, 1, 8], [14, 8.0, 1, 0]] },
+  { label: "stairs up to a platform", cam: [5, 8.5], ang: 0 },
+  { label: "standing on the platform, looking back", cam: [14, 8.5], ang: Math.PI, eyeZ: 0.75 },
+  { label: "crates seen from up on a platform", cam: [14, 12.0], ang: Math.PI, eyeZ: 0.75 },
+  { label: "the exit", cam: [5, 8.5], ang: 0, exit: [11, 8.5] },
+  { label: "blood on the floor", cam: [5, 8.5], ang: 0,
+    decals: [[8, 8.5, 0.7], [9.5, 8.0, 0.5], [10.5, 9.2, 0.8]] },
+  { label: "wipe: mostly covered (melt 0.75)", cam: [5, 8.5], ang: 0, melt: 0.75,
+    foes: [[10, 8.5, 1, 0]] },
+  { label: "wipe: falling away (melt 0.35)", cam: [5, 8.5], ang: 0, melt: 0.35,
+    foes: [[10, 8.5, 1, 0]] },
+  { label: "wipe: finished (melt 0)", cam: [5, 8.5], ang: 0, melt: 0,
+    foes: [[10, 8.5, 1, 0]] },
+  { label: "changing weapon", cam: [5, 8.5], ang: 0, weapon: 1, switching: 0.5 },
+];
+
+function uniforms(s, w = W, h = H) {
+  const data = new ArrayBuffer(U_FLOATS * 4);
+  const uf = new Float32Array(data), uu = new Uint32Array(data);
+  uf[0] = w; uf[1] = h; uf[2] = 0.8; uf[3] = s.time || 0;
+  uf[4] = s.cam[0]; uf[5] = s.cam[1]; uf[6] = s.ang; uf[7] = s.pitch || 0;
+  uf[8] = s.gun || 0; uf[9] = s.flash || 0; uf[10] = s.hurt || 0; uf[11] = s.dead || 0;
+  uf[12] = s.bob || 0; uf[13] = s.shakeX || 0; uf[14] = s.shakeY || 0; uf[15] = 0;
+  uf[15] = s.hudTop || 0;
+  uf[16] = (s.eyeZ === undefined ? 0 : s.eyeZ) + 0.5;
+  uf[17] = s.weapon || 0; uf[18] = s.hurtDir || 0; uf[19] = s.shake || 0;
+  uf[20] = 0;
+  uf[21] = s.exit ? s.exit[0] : -50; uf[22] = s.exit ? s.exit[1] : -50;
+  uf[23] = s.melt || 0; uf[24] = s.switching || 0;
+
+  const lvl = s.level || HALL_LEVEL;
+  uu.set(lvl.solid, O_SOLID);
+  uu.set(lvl.low, O_LOW);
+  uu.set(lvl.door, O_DOOR);
+  uu.set(lvl.h0 || new Uint32Array(WORDS), O_HGT0);
+  uu.set(lvl.h1 || new Uint32Array(WORDS), O_HGT1);
+
+  // Empty slots are zeroed with a negative in the last channel, which is how
+  // the shader is told to skip them. Enemies use the third channel instead,
+  // since a liveness of zero already means gone.
+  const slots = (offset, count, list) => {
+    for (let i = 0; i < count; i++) {
+      const o = offset + i * 4;
+      const v = (list || [])[i];
+      uf[o] = v ? v[0] : 0;
+      uf[o + 1] = v ? v[1] : 0;
+      uf[o + 2] = v ? v[2] : 0;
+      uf[o + 3] = v ? v[3] : -1;
+    }
+  };
+  slots(O_FOES, MAX.foes, s.foes);
+  slots(O_DOORS, MAX.doors, s.doors);
+  slots(O_PICKS, MAX.picks, s.picks);
+  slots(O_SHOTS, MAX.shots, s.shots);
+  slots(O_PARTS, MAX.parts, s.parts);
+  // Decals are skipped on a radius of zero rather than a negative fourth
+  // channel, so they cannot use the shared filler.
+  for (let i = 0; i < MAX.decals; i++) {
+    const o = O_DECALS + i * 4;
+    const v = (s.decals || [])[i];
+    uf[o] = v ? v[0] : 0;
+    uf[o + 1] = v ? v[1] : 0;
+    uf[o + 2] = v ? v[2] : 0;
+    uf[o + 3] = 0;
+  }
+  return data;
+}
+
+// One render pass into whatever view is handed in. Returns the encoder rather
+// than submitting, so the caller can append a texture-to-buffer copy to the
+// same command buffer when it wants the pixels.
+function draw(pipe, view, data) {
+  const buf = device.createBuffer({ size: data.byteLength,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  device.queue.writeBuffer(buf, 0, data);
+  const snap = pipelineFormat.get(pipe) === "rgba8unorm" ? snapRead : snapCanvas;
+  const bind = device.createBindGroup({ layout: pipe.getBindGroupLayout(0),
+    entries: [
+      { binding: 0, resource: { buffer: buf } },
+      { binding: 1, resource: snap.createView() },
+      { binding: 2, resource: sampler },
+    ] });
+  const enc = device.createCommandEncoder();
+  const pass = enc.beginRenderPass({ colorAttachments: [{ view,
+    clearValue: { r: 0, g: 0, b: 0, a: 1 }, loadOp: "clear", storeOp: "store" }] });
+  pass.setPipeline(pipe);
+  pass.setBindGroup(0, bind);
+  pass.draw(3);
+  pass.end();
+  return enc;
+}
+
+async function readback(pipe, data) {
+  const tex = device.createTexture({ size: [W, H], format: "rgba8unorm",
+    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
+  const bpr = Math.ceil(W * 4 / 256) * 256;
+  const buf = device.createBuffer({ size: bpr * H,
+    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+  const enc = draw(pipe, tex.createView(), data);
+  enc.copyTextureToBuffer({ texture: tex }, { buffer: buf, bytesPerRow: bpr }, [W, H]);
+  device.queue.submit([enc.finish()]);
+  await buf.mapAsync(GPUMapMode.READ);
+  const px = Uint8Array.from(new Uint8Array(buf.getMappedRange()));
+  buf.unmap();
+  return { px, bpr };
+}
+
+for (const s of scenarios) {
+  const wrap = document.createElement("div");
+  wrap.className = "card";
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const cap = document.createElement("span");
+  cap.textContent = s.label;
+  const out = document.createElement("pre");
+  wrap.append(canvas, cap, out);
+  document.body.append(wrap);
+
+  const ctx = canvas.getContext("webgpu");
+  ctx.configure({ device, format, alphaMode: "opaque" });
+  const data = uniforms(s);
+  device.queue.submit([draw(pipeline, ctx.getCurrentTexture().createView(), data).finish()]);
+
+  const { px, bpr } = await readback(readPipeline, data);
+  const at = (fx, fy) => {
+    const o = Math.floor(H * fy) * bpr + Math.floor(W * fx) * 4;
+    return px[o] + "," + px[o + 1] + "," + px[o + 2];
+  };
+  const line = "x50 y: " + [0.08, 0.3, 0.45, 0.55, 0.75]
+    .map((fy) => fy + "=" + at(0.5, fy)).join("  ");
+  out.textContent = line;
+  console.log(s.label + " | " + line);
+}
+console.log("scenarios drawn: " + scenarios.length);
+
+// Content checks. The comparison below proves the packed shader matches the
+// original, which says nothing when both are wrong: a bug that dropped the
+// vertical span test on walls made distant geometry paint the whole upper
+// screen, and every scenario still "matched". These assert what the image is
+// supposed to contain.
+{
+  let bad = 0;
+  const report = (ok, text) => {
+    console.log((ok ? "ok   " : "FAIL ") + text);
+    if (!ok) bad++;
+    const d = document.createElement("div");
+    d.textContent = (ok ? "ok   " : "FAIL ") + text;
+    d.style.cssText = "font:13px monospace;padding:2px 8px;color:" + (ok ? "#7c7" : "#e55");
+    document.body.prepend(d);
+  };
+
+  const hall = scenarios.find((s) => s.label === "imp and caster down the hall");
+  const { px, bpr } = await readback(readPipeline, uniforms(hall));
+  const at = (fx, fy) => {
+    const o = Math.floor(H * fy) * bpr + Math.floor(W * fx) * 4;
+    return (px[o] + px[o + 1] + px[o + 2]) / 3;
+  };
+  // Looking down a corridor, the top of the frame is ceiling: dark, and much
+  // darker than the lit wall band across the middle.
+  const top = at(0.5, 0.03), band = at(0.5, 0.45), floorRow = at(0.5, 0.8);
+  report(top < 90, "the top of the screen is ceiling, not smeared wall (" + top.toFixed(0) + ")");
+  report(floorRow > top, "the floor is brighter than the ceiling (" +
+         floorRow.toFixed(0) + " vs " + top.toFixed(0) + ")");
+  report(band > 20 && band < 200, "the wall band is lit but not blown out (" + band.toFixed(0) + ")");
+
+  // Does the height field actually change the picture? Render the staircase
+  // scenario with the elevation planes and again with them zeroed: if raised
+  // ground draws, the two images cannot be close. Sampling one row and hoping
+  // it crosses a step is guesswork; this is not.
+  const stairs = scenarios.find((s) => s.label === "stairs up to a platform");
+  const withSteps = await readback(readPipeline, uniforms(stairs));
+  const flat = await readback(readPipeline,
+    uniforms({ ...stairs, level: { ...HALL_LEVEL, h0: new Uint32Array(WORDS), h1: new Uint32Array(WORDS) } }));
+  let differing = 0;
+  for (let i = 0; i < withSteps.px.length; i += 4) {
+    if (Math.abs(withSteps.px[i] - flat.px[i]) > 6) differing++;
+  }
+  const share = differing / (withSteps.px.length / 4);
+  // Three percent of a frame is roughly sixteen thousand pixels, which is a
+  // staircase seen from across a hall. Noise would be zero.
+  report(share > 0.015, "raised ground changes the image (" +
+         (share * 100).toFixed(1) + "% of pixels differ from flat)");
+  if (bad) console.log(bad + " CONTENT CHECKS FAILED");
+}
+
+// The packer strips the WGSL before shipping it. Whitespace and comments cannot
+// change what a shader computes, so prove it: render every scenario through
+// both versions and demand the pixels come back identical.
+{
+  // Exactly what the packer ships: whitespace stripped, then identifiers
+  // shortened. Both passes are verified by the comparison below.
+  const minified = renameWgsl(minifyWgsl(code));
+  const mod = device.createShaderModule({ code: minified });
+  const errs = (await mod.getCompilationInfo()).messages.filter((e) => e.type === "error");
+  for (const e of errs) console.log("MINIFIED WGSL ERROR line " + e.lineNum + ": " + e.message);
+  const minPipeline = makePipeline(mod, "rgba8unorm");
+
+  let worst = 0, differing = 0;
+  for (const s of scenarios) {
+    const data = uniforms(s);
+    const a = await readback(readPipeline, data);
+    const b = await readback(minPipeline, data);
+    for (let i = 0; i < a.px.length; i++) {
+      const d = Math.abs(a.px[i] - b.px[i]);
+      if (d) { differing++; worst = Math.max(worst, d); }
+    }
+  }
+  const ok = errs.length === 0 && worst === 0;
+  console.log((ok ? "ok   " : "FAIL ") + "minified shader is pixel identical over " +
+    scenarios.length + " scenarios (" + differing + " differing bytes, worst " + worst + ")");
+  const banner = document.createElement("div");
+  banner.textContent = (ok ? "PASS" : "FAIL") + " minified WGSL pixel identical: " +
+    differing + " differing bytes";
+  banner.style.cssText = "color:" + (ok ? "#7c7" : "#e55") + ";font:14px monospace;padding:8px";
+  document.body.prepend(banner);
+  console.log("shader source " + code.length + " B, minified " + minified.length + " B");
+}
+
+// Rough GPU cost at 1080p. The texture work is per pixel, four octaves of noise
+// are not free, and the ray now walks past cover and part-open doors instead of
+// stopping at the first solid cell, so this is worth watching as the shader grows.
+{
+  const BW = 1920, BH = 1080, N = 60;
+  const tex = device.createTexture({ size: [BW, BH], format: "rgba8unorm",
+    usage: GPUTextureUsage.RENDER_ATTACHMENT });
+  const view = tex.createView();
+  const data = uniforms(scenarios[0], BW, BH);
+  const buf = device.createBuffer({ size: data.byteLength,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+  device.queue.writeBuffer(buf, 0, data);
+  const bind = device.createBindGroup({ layout: readPipeline.getBindGroupLayout(0),
+    entries: [{ binding: 0, resource: { buffer: buf } }] });
+
+  await device.queue.onSubmittedWorkDone();
+  const t0 = performance.now();
+  for (let i = 0; i < N; i++) {
+    const enc = device.createCommandEncoder();
+    const pass = enc.beginRenderPass({ colorAttachments: [{ view,
+      clearValue: { r: 0, g: 0, b: 0, a: 1 }, loadOp: "clear", storeOp: "store" }] });
+    pass.setPipeline(readPipeline);
+    pass.setBindGroup(0, bind);
+    pass.draw(3);
+    pass.end();
+    device.queue.submit([enc.finish()]);
+  }
+  await device.queue.onSubmittedWorkDone();
+  const ms = (performance.now() - t0) / N;
+  console.log("1080p frame cost approx " + ms.toFixed(2) + " ms (" + (1000 / ms).toFixed(0) + " fps)");
+}
+</script>
+</body>
+</html>
