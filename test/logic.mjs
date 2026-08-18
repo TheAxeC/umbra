@@ -14,6 +14,7 @@
 // here. Both markers are ordinary source text, so if someone reorganises
 // index.html this throws rather than silently testing half a file.
 import { readFileSync } from "node:fs";
+import { applyFences, fenceNames } from "../build/fences.mjs";
 
 const src = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const start = src.indexOf("const MAP_SIZE");
@@ -519,7 +520,13 @@ check("a shallower one is not", getBest() === wasBest + 3);
 
 console.log("level generation");
 let minSpots = 99, worstOpen = 1, bestOpen = 0, unreachable = 0, caves = 0, rooms = 0, shortExit = 0;
-for (let seed = 1; seed <= 40; seed++) {
+// Through level 60 rather than 40, because levels 45 and 49 used to hang. The
+// cave generator picked spawn spots with a loop that only exited on its twelfth
+// successful placement, and a cave too tight to hold twelve points nine cells
+// apart never produced a twelfth: seed 1382 spun past forty million iterations.
+// If that ever comes back this loop stops returning, which is a blunt failure
+// but not a quiet one.
+for (let seed = 1; seed <= 60; seed++) {
   setLevel(seed);
   buildLevel(BASE_SEED + seed);
   if ((BASE_SEED + seed) % 2) rooms++; else caves++;
@@ -637,6 +644,145 @@ check("both progressions cover whole bars",
 check("an octave up doubles the frequency", Math.abs(noteHz(12) - ROOT * 2) < 1e-9);
 check("the tempo is plausible", BPM > 60 && BPM < 220, "bpm=" + BPM);
 check("the swing is a nudge, not a lurch", SWING > 0 && SWING < 0.34, "swing=" + SWING);
+
+// --- the fenced variants -----------------------------------------------------
+//
+// Everything above runs the full game. The competition build drops fenced
+// regions from the same source, and a cut that leaves a dangling reference
+// produces a broken artifact that nothing above would notice. So take the logic
+// block of every cut, one region at a time and then all of them together, and
+// demand it evaluates.
+//
+// What this catches: a stub with a typo in it, a region that took a binding
+// something else still reads, and a fence left unbalanced. What it does not
+// catch: a mistake that only shows at a call site these checks never reach, and
+// anything below the shader, which is not in the block. The chaingun cut
+// originally crashed in updateHud, which is outside this range, so treat a pass
+// here as the floor rather than the ceiling.
+// Every marker line has to be a well formed comment where it sits, or it is
+// not inert in the unpacked source. The packer strips marker lines before it
+// writes anything, so a marker that opens a comment and never closes it leaves
+// dist/ perfectly correct and the file you actually run in the browser broken.
+// That happened: an unclosed `<!-- TINY-OFF polish` swallowed the stamina cell,
+// #stam stopped existing, and updateHud threw on the first frame while all
+// three harnesses stayed green.
+{
+  let bad = null;
+  src.split("\n").forEach((line, i) => {
+    if (!/TINY-(OFF|END|ON)/.test(line)) return;
+    if (line.includes("<!--") !== line.includes("-->")) bad = bad || "line " + (i + 1) + ": unclosed HTML comment";
+    if (line.includes("/*") !== line.includes("*/")) bad = bad || "line " + (i + 1) + ": unclosed block comment";
+  });
+  check("every fence marker is a closed comment", bad === null, bad || "");
+}
+
+const fenced = fenceNames(src);
+for (const pick of [...fenced.map((n) => [n]), fenced]) {
+  const label = pick.length === 1 ? pick[0] : "all " + pick.length + " together";
+  let err = null;
+  let built = null;
+  try {
+    const cut = applyFences(src, (n) => pick.includes(n)).text;
+    const from = cut.indexOf("const MAP_SIZE");
+    const to = cut.indexOf("// Shader. Fullscreen triangle");
+    if (from < 0 || to < 0 || to < from) throw new Error("logic block vanished");
+    // Named with typeof guards, because a cut is allowed to remove any of
+    // these and asking for a binding that is gone would throw here and be
+    // reported as the cut being broken when it is not.
+    built = new Function(cut.slice(from, to) + `
+      return {
+        buildLevel: typeof buildLevel === "function" ? buildLevel : null,
+        fits: typeof fits === "function" ? fits : null,
+        START: typeof START !== "undefined" ? START : null,
+        FOE_SPAWNS: typeof FOE_SPAWNS !== "undefined" ? FOE_SPAWNS : null,
+        FOE_R: typeof FOE_R !== "undefined" ? FOE_R : 0,
+        BASE_SEED: typeof BASE_SEED !== "undefined" ? BASE_SEED : 0,
+        initAudio: typeof initAudio === "function" ? initAudio : null,
+        sfx: Object.fromEntries(Object.entries({
+          sfxShoot: typeof sfxShoot === "function" ? sfxShoot : 0,
+          sfxDryFire: typeof sfxDryFire === "function" ? sfxDryFire : 0,
+          sfxSwitch: typeof sfxSwitch === "function" ? sfxSwitch : 0,
+          sfxImpHit: typeof sfxImpHit === "function" ? sfxImpHit : 0,
+          sfxImpDie: typeof sfxImpDie === "function" ? sfxImpDie : 0,
+          sfxGrowl: typeof sfxGrowl === "function" ? sfxGrowl : 0,
+          sfxSwing: typeof sfxSwing === "function" ? sfxSwing : 0,
+          sfxCast: typeof sfxCast === "function" ? sfxCast : 0,
+          sfxExplode: typeof sfxExplode === "function" ? sfxExplode : 0,
+          sfxHurt: typeof sfxHurt === "function" ? sfxHurt : 0,
+          sfxDie: typeof sfxDie === "function" ? sfxDie : 0,
+          sfxClear: typeof sfxClear === "function" ? sfxClear : 0,
+          sfxPickup: typeof sfxPickup === "function" ? sfxPickup : 0,
+          sfxDoor: typeof sfxDoor === "function" ? sfxDoor : 0,
+          sfxLocked: typeof sfxLocked === "function" ? sfxLocked : 0,
+          sfxStep: typeof sfxStep === "function" ? sfxStep : 0,
+        }).filter(([, f]) => f)),
+      };`)();
+  } catch (e) {
+    err = e.message;
+  }
+  check("--tiny=" + label + " still evaluates", err === null, err || "");
+
+  // Evaluating and generating both leave the sound effects untouched, because
+  // with no AudioContext every one of them returns at its first line. That is
+  // exactly where a cut hides: fencing the song took noteHz with it, and the
+  // pickup chime and the clear fanfare name notes too, so a music-cut build
+  // threw on the next pickup and nothing here noticed.
+  //
+  // A Proxy standing in for the whole Web Audio API is enough to get past the
+  // guard and run each effect to its end. It answers every property with
+  // another callable Proxy and swallows every assignment, so the arithmetic in
+  // there produces NaN and the graph goes nowhere, which does not matter: what
+  // is under test is whether the code still resolves the names it uses.
+  if (built && built.initAudio && built.sfx) {
+    const stub = () => new Proxy(function () {}, {
+      // Numbers where a number is wanted: the reverb builder multiplies the
+      // sample rate, and a Proxy that cannot become a primitive throws there
+      // before any effect gets a chance to run. `then` is undefined so nothing
+      // mistakes one of these for a promise.
+      get: (t, k) => {
+        if (k === Symbol.toPrimitive) return () => 1;
+        if (k === "valueOf") return () => 1;
+        if (k === "toString") return () => "1";
+        if (k === "then") return undefined;
+        return stub();
+      },
+      set: () => true,
+      apply: () => stub(),
+    });
+    const savedWindow = globalThis.window;
+    globalThis.window = { AudioContext: function () { return stub(); } };
+    const savedInterval = globalThis.setInterval;
+    globalThis.setInterval = () => 0;
+    let broke = null;
+    try {
+      built.initAudio();
+      for (const [name, fn] of Object.entries(built.sfx)) {
+        try { fn(1, 1); } catch (e) { broke = broke || name + ": " + e.message; }
+      }
+    } catch (e) {
+      broke = "initAudio: " + e.message;
+    }
+    globalThis.window = savedWindow;
+    globalThis.setInterval = savedInterval;
+    check("--tiny=" + label + " still makes every sound", broke === null, broke || "");
+  }
+
+  // Evaluating proves the module loads. Generating proves the cut still makes
+  // levels, which matters because a cut is allowed to change the generator:
+  // dropping the rooms layout leaves caves as the only one and replaces the
+  // fallback that ran when a cave collapsed.
+  if (built && built.buildLevel && built.fits) {
+    let bad = null;
+    for (let level = 1; level <= 12 && !bad; level++) {
+      built.buildLevel(built.BASE_SEED + level);
+      if (!built.fits(built.START[0], built.START[1])) bad = "level " + level + " start is solid";
+      for (const [x, y] of built.FOE_SPAWNS || []) {
+        if (!built.fits(x, y, built.FOE_R)) bad = "level " + level + " spawn is solid";
+      }
+    }
+    check("--tiny=" + label + " still generates levels", bad === null, bad || "");
+  }
+}
 
 console.log(failures === 0 ? "\nall checks passed" : "\n" + failures + " FAILED");
 process.exit(failures === 0 ? 0 : 1);

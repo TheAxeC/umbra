@@ -29,10 +29,12 @@
   .btn, .foot, #hint, #note, .cell, #over, h1 + p { text-align: center }
   .foot, .cell i, #hint, h1 + p { color: #6f6b7d; font-size: 11px; letter-spacing: 3px }
 
+  /* TINY-OFF settings */
   .row { display: grid; grid-template-columns: 150px 210px 66px; align-items: center;
          gap: 12px; letter-spacing: 3px; font-size: 12px }
   .row input { width: 100%; accent-color: #e8503a }
   .row span:last-child { text-align: right }
+  /* TINY-END */
 
   #hud { bottom: 0; height: 78px; display: flex; background: #12101a;
          border-top: 2px solid #3b3547 }
@@ -43,8 +45,11 @@
   .cell i { margin-top: 5px; font-size: 9px }
   .cell.wide { flex: 1; min-width: 0 }
   #armour b { color: #4f8fd6 }
+  /* TINY-OFF polish */
   #stamBar i { background: #4f8fd6 }
+  /* TINY-END */
 
+  /* TINY-OFF polish */
   #face { width: 46px; height: 50px; position: relative; background: #6b4a3a;
           border: 2px solid #23202c }
   #face span { position: absolute }
@@ -53,6 +58,7 @@
   #face .eye b { top: 2px; left: 2px; width: 4px; height: 4px; background: #171219; display: block }
   #face .mouth { left: 11px; right: 11px; bottom: 9px; height: 4px; background: #2a1b18 }
   #face .brow { left: 6px; right: 6px; top: 9px; height: 3px; background: #40291f }
+  /* TINY-END */
 
   #slots { display: flex; gap: 7px }
   #slots div { display: flex; flex-direction: column; align-items: center; gap: 3px;
@@ -62,15 +68,22 @@
   #slots .dim { opacity: .22 }
   #slots .on { border-color: #e8503a; color: #fff }
   #keys { display: flex; gap: 5px }
+  /* TINY-OFF polish */
   #keys i, #stamBar { border: 1px solid #2f2a3a; display: block }
+  /* TINY-END */
+  /* TINY-ON polish:   #keys i { border: 1px solid #2f2a3a; display: block } */
   #keys i { width: 12px; height: 17px; opacity: .16 }
   #keys .have { opacity: 1 }
   #kr { background: #c2402f } #kb { background: #3f6bc4 }
+  /* TINY-OFF polish */
   #stamBar { width: 44px; height: 8px }
   #stamBar i { height: 100%; width: 100%; display: block }
+  /* TINY-END */
 
   #hint { bottom: 96px; letter-spacing: 4px }
+  /* TINY-OFF notes */
   #note { top: 16%; color: #d8d4e2; letter-spacing: 6px }
+  /* TINY-END */
 </style>
 </head>
 <body>
@@ -79,10 +92,14 @@
 <div id="hud" class="off">
   <div class="cell"><b id="hp">100</b><i>HEALTH</i></div>
   <div class="cell" id="armour"><b id="arm">0</b><i>ARMOUR</i></div>
+  <!-- TINY-OFF polish -->
   <div class="cell"><span id="stamBar"><i id="stam"></i></span><i>STAMINA</i></div>
+  <!-- TINY-END -->
+  <!-- TINY-OFF polish -->
   <div class="cell">
     <div id="face"><span class="brow"></span><span class="eye l"><b></b></span><span class="eye r"><b></b></span><span class="mouth"></span></div>
   </div>
+  <!-- TINY-END -->
   <div class="cell"><b id="ammo">--</b><i id="ammoName">BULLETS</i></div>
   <div class="cell"><b id="kills">0/0</b><i>KILLS</i></div>
   <div class="cell"><b id="lvl">1</b><i>LEVEL</i></div>
@@ -92,28 +109,47 @@
     <i>ARMS</i>
   </div>
 </div>
+<!-- TINY-OFF notes -->
 <div id="note" class="off"></div>
+<!-- TINY-END -->
+<!-- TINY-OFF chaingun -->
 <div id="hint" class="off">WASD MOVE &middot; MOUSE LOOK &middot; CLICK FIRE &middot; 1-3 WEAPONS &middot; E DOORS &middot; ESC PAUSE</div>
+<!-- TINY-END -->
+<!-- TINY-ON chaingun: <div id="hint" class="off">WASD MOVE &middot; MOUSE LOOK &middot; CLICK FIRE &middot; 1-2 WEAPONS &middot; E DOORS &middot; ESC PAUSE</div> -->
 
 <div id="menu" class="panel">
   <h1>UMBRA</h1>
-  <p>A DOOM SHAPED SHOOTER IN 14 KILOBYTES</p>
+  <!-- TINY-OFF size -->
+  <p>A DOOM SHAPED SHOOTER IN ONE HTML FILE</p>
+  <!-- TINY-END -->
+  <!-- TINY-ON size:   <p>A DOOM SHAPED SHOOTER IN 13 KILOBYTES</p> -->
   <div class="btn" id="play">PLAY</div>
+  <!-- TINY-OFF settings -->
   <div class="btn" id="toSettings">SETTINGS</div>
+  <!-- TINY-END -->
+  <!-- TINY-OFF best -->
   <div class="foot" id="best"></div>
+  <!-- TINY-END -->
+  <!-- TINY-OFF chaingun -->
   <div class="foot">WASD MOVE &middot; MOUSE LOOK &middot; CLICK FIRE &middot; SHIFT RUN<br>1-3 WEAPONS &middot; E OPENS DOORS &middot; M MUTES &middot; ESC PAUSES</div>
+  <!-- TINY-END -->
+  <!-- TINY-ON chaingun:   <div class="foot">WASD MOVE &middot; MOUSE LOOK &middot; CLICK FIRE &middot; SHIFT RUN<br>1-2 WEAPONS &middot; E OPENS DOORS &middot; M MUTES &middot; ESC PAUSES</div> -->
 </div>
 
+<!-- TINY-OFF settings -->
 <div id="settingsPanel" class="panel off">
   <h2>SETTINGS</h2>
   <div id="rows"></div>
   <div class="btn" id="backFromSettings">BACK</div>
 </div>
+<!-- TINY-END -->
 
 <div id="pause" class="panel off">
   <h2>PAUSED</h2>
   <div class="btn" id="resume">RESUME</div>
+  <!-- TINY-OFF settings -->
   <div class="btn" id="pauseSettings">SETTINGS</div>
+  <!-- TINY-END -->
   <div class="btn" id="quit">ABANDON RUN</div>
 </div>
 
@@ -150,9 +186,12 @@ const DOORBIT = new Uint32Array(MAP_WORDS);
 // a cell is not just open or shut, it is open at a height.
 const HGT0 = new Uint32Array(MAP_WORDS);
 const HGT1 = new Uint32Array(MAP_WORDS);
+// TINY-OFF elevation
 const STEP = 0.25;          // one step, in wall heights
 const CLIMB = 0.28;         // the tallest step anything can walk up
+// TINY-END
 
+// TINY-OFF elevation
 function heightAt(cx, cy) {
   if (cx < 0 || cy < 0 || cx >= MAP_SIZE || cy >= MAP_SIZE) return 0;
   return ((bitAt(HGT0, cx, cy) ? 1 : 0) + (bitAt(HGT1, cx, cy) ? 2 : 0)) * STEP;
@@ -162,6 +201,8 @@ function setHeight(cx, cy, level) {
   if (level & 1) setBit(HGT0, cx, cy); else clearBit(HGT0, cx, cy);
   if (level & 2) setBit(HGT1, cx, cy); else clearBit(HGT1, cx, cy);
 }
+// TINY-END
+// TINY-ON elevation: function heightAt() { return 0; }
 
 function bitAt(plane, cx, cy) {
   return ((plane[cy * 2 + (cx >> 5)] >>> (cx & 31)) & 1) !== 0;
@@ -194,11 +235,13 @@ function carve(cx, cy) {
   clearBit(DOORBIT, cx, cy);
 }
 
+// TINY-OFF elevation
 // Can something standing on `from` step onto the cell at (cx, cy)? A drop of
 // any size is allowed, a rise only up to one step.
 function canStep(fromZ, cx, cy) {
   return heightAt(cx, cy) - fromZ <= CLIMB;
 }
+// TINY-END
 
 // ---------------------------------------------------------------------------
 // Level generation.
@@ -212,8 +255,10 @@ function canStep(fromZ, cx, cy) {
 // Everything comes from the seed, so a level can always be rebuilt exactly.
 // ---------------------------------------------------------------------------
 
+// TINY-OFF rooms
 const ROOMS = 11;
 const ROOM_MIN = 5, ROOM_MAX = 12;
+// TINY-END
 const MAX_DOORS = 5;
 
 let rand = () => 0;
@@ -230,6 +275,7 @@ function randInt(n) {
   return Math.floor(rand() * n);
 }
 
+// TINY-OFF rooms
 function corridorX(x0, x1, y) {
   for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) carve(x, y);
 }
@@ -276,6 +322,8 @@ function carveRooms() {
 
   return rooms.map((r) => ({ x: r.cx + 0.5, y: r.cy + 0.5 }));
 }
+
+// TINY-END
 
 // --- layout two: caves ------------------------------------------------------
 
@@ -326,11 +374,17 @@ function carveCaves() {
   // Spread candidate positions out over the surviving cave.
   const cells = [...region].map((i) => ({ x: (i % MAP_SIZE) + 0.5, y: Math.floor(i / MAP_SIZE) + 0.5 }));
   const spots = [];
-  for (let i = 0; i < 14 && cells.length; i++) {
+  // Bounded by attempts, not by successes. Insisting on twelve placements that
+  // are each more than nine cells from every other one is not always possible
+  // in a cave this size, and a loop that only exits on the twelfth success then
+  // never exits at all: seeds 1382 and 1386, which are levels 45 and 49, spun
+  // past forty million iterations and froze the tab. A cave that cannot hold
+  // twelve spread out spots should get as many as it can hold. Healthy seeds
+  // need 29 attempts at the median and 140 at the ninetieth percentile, so this
+  // ceiling does not change the levels that already worked.
+  for (let tries = 0; tries < 400 && cells.length && spots.length < 12; tries++) {
     const pick = cells[randInt(cells.length)];
     if (spots.every((s) => Math.hypot(s.x - pick.x, s.y - pick.y) > 9)) spots.push(pick);
-    else i--;
-    if (spots.length > 11) break;
   }
   return spots.length ? spots : cells.slice(0, 8);
 }
@@ -475,6 +529,7 @@ function openCells() {
   return out;
 }
 
+// TINY-OFF elevation
 // Raised ground. A platform is a rectangle lifted one or two steps, with a
 // staircase running off one edge so it can be walked up. Everything checks
 // canStep as it goes, so a platform can never be built that cannot be reached.
@@ -514,6 +569,8 @@ function raiseGround(open, count) {
   }
 }
 
+// TINY-END
+
 function generate(seed) {
   seedRng(seed);
   SOLID.fill(0xffffffff);
@@ -521,16 +578,26 @@ function generate(seed) {
   DOORBIT.fill(0);
   HGT0.fill(0);
   HGT1.fill(0);
+  // TINY-OFF rooms
   if (seed & 1) return carveRooms();
+  // TINY-END
   const caves = carveCaves();
   if (caves) return caves;
-  // The cave collapsed. Start again from the same seed as a rooms level, which
-  // keeps generation deterministic.
+  // The cave collapsed, which happens to one seed in four thousand. Start again
+  // from the same seed as a rooms level, which keeps generation deterministic.
+  // TINY-OFF rooms
   seedRng(seed);
   SOLID.fill(0xffffffff);
   LOW.fill(0);
   DOORBIT.fill(0);
   return carveRooms();
+  // TINY-END
+  // With no second layout to fall back on, clear the collapsed cave away and
+  // hand back one plain room. Deterministic, always connected, and unlike a
+  // retry it cannot fail twice.
+  // TINY-ON rooms:   SOLID.fill(0xffffffff); LOW.fill(0); DOORBIT.fill(0);
+  // TINY-ON rooms:   for (let y = 20; y < 44; y++) { for (let x = 20; x < 44; x++) { carve(x, y); } }
+  // TINY-ON rooms:   return [{ x: 32.5, y: 32.5 }];
 }
 
 // The player is a square of half-width RADIUS, so a cell is walkable only if
@@ -551,10 +618,13 @@ function fits(x, y, r = RADIUS, fromZ = null) {
   const x0 = Math.floor(x - r), x1 = Math.floor(x + r);
   const y0 = Math.floor(y - r), y1 = Math.floor(y + r);
   if (solidAt(x0, y0) || solidAt(x1, y0) || solidAt(x0, y1) || solidAt(x1, y1)) return false;
+  // TINY-OFF elevation
   // A step too tall is as good as a wall.
   if (fromZ === null) return true;
   return canStep(fromZ, x0, y0) && canStep(fromZ, x1, y0) &&
          canStep(fromZ, x0, y1) && canStep(fromZ, x1, y1);
+  // TINY-END
+  // TINY-ON elevation:   return true;
 }
 
 // The floor under a body of this size, which is the highest of the cells it
@@ -615,11 +685,13 @@ function setState(next) {
     keys.clear();
     if (document.pointerLockElement) document.exitPointerLock();
   }
+  // TINY-OFF music
   if (audio) {
     // Duck the music behind a menu rather than stopping it.
     audio.music.gain.setTargetAtTime(next === S_PLAY ? MUSIC_GAIN : MUSIC_GAIN * 0.35,
                                      audio.ctx.currentTime, 0.15);
   }
+  // TINY-END
 }
 
 // ---------------------------------------------------------------------------
@@ -630,7 +702,9 @@ const settings = {
   sensitivity: 1.0,
   fov: 0.8,
   volume: 0.5,
+  // TINY-OFF music
   music: 0.6,
+  // TINY-END
   difficulty: 1,        // 0 easy, 1 normal, 2 hard
 };
 
@@ -647,7 +721,9 @@ const STORE = "umbra.";
 function loadSettings() {
   try {
     Object.assign(settings, JSON.parse(localStorage.getItem(STORE + "settings") || "{}"));
+    // TINY-OFF best
     best = Math.max(1, parseInt(localStorage.getItem(STORE + "best") || "1", 10) || 1);
+    // TINY-END
   } catch (e) {
     // A corrupt or unavailable store is not worth failing over.
   }
@@ -662,6 +738,7 @@ function saveSettings() {
   }
 }
 
+// TINY-OFF best
 function recordBest(reached) {
   if (reached <= best) return;
   best = reached;
@@ -671,10 +748,12 @@ function recordBest(reached) {
     // Same as above: not worth failing over.
   }
 }
+// TINY-END
 
 // fov is stored the way the shader wants it, as the half width of the camera
 // plane at unit distance, but presented in degrees because that is what a
 // player expects to see on a slider.
+// TINY-OFF settings
 function fovToDegrees(f) {
   return Math.round(2 * Math.atan(f) * 180 / Math.PI);
 }
@@ -682,6 +761,7 @@ function fovToDegrees(f) {
 function degreesToFov(deg) {
   return Math.tan(deg / 2 * Math.PI / 180);
 }
+// TINY-END
 
 // ---------------------------------------------------------------------------
 // Screens and controls. All of the DOM lives here; the rest of the game only
@@ -697,17 +777,27 @@ function bindUi(canvas) {
   hud.kills = $("kills");
   hud.lvl = $("lvl");
   hud.arm = $("arm");
+  // TINY-OFF polish
   hud.stam = $("stam");
+  // TINY-END
+  // TINY-OFF best
   hud.best = $("best");
+  // TINY-END
+  // TINY-OFF polish
   hud.face = $("face");
   hud.brow = hud.face.querySelector(".brow");
   hud.mouth = hud.face.querySelector(".mouth");
+  // TINY-END
   hud.keyRed = $("kr");
   hud.keyBlue = $("kb");
+  // TINY-OFF notes
   hud.note = $("note");
+  // TINY-END
 
   screens.menu = $("menu");
+  // TINY-OFF settings
   screens.settings = $("settingsPanel");
+  // TINY-END
   screens.pause = $("pause");
   screens.over = $("over");
   screens.hud = $("hud");
@@ -717,6 +807,7 @@ function bindUi(canvas) {
 
   installInput(canvas);
 
+  // TINY-OFF settings
   // Settings can be reached from the menu or from the pause screen, and BACK
   // has to return to whichever it was.
   let settingsFrom = S_MENU;
@@ -730,25 +821,34 @@ function bindUi(canvas) {
     screens.settings.classList.add("off");
     setState(settingsFrom);
   };
+  // TINY-END
 
   $("play").onclick = () => {
     level = 1;
     restart(false);
+    // TINY-OFF melt
     player.melt = 1;
+    // TINY-END
     setState(S_PLAY);
     Promise.resolve(canvas.requestPointerLock()).catch(() => {});
   };
+  // TINY-OFF settings
   $("toSettings").onclick = () => openSettings(S_MENU);
   $("pauseSettings").onclick = () => openSettings(S_PAUSE);
   $("backFromSettings").onclick = closeSettings;
+  // TINY-END
   $("resume").onclick = () => setState(S_PLAY);
+  // TINY-OFF melt
   $("quit").onclick = () => { level = 1; restart(false); player.melt = 1; setState(S_MENU); };
+  // TINY-END
+  // TINY-ON melt:   $("quit").onclick = () => { level = 1; restart(false); setState(S_MENU); };
 
   // Weapon slots, built from the table that already names them.
   $("slots").innerHTML = WEAPONS
     .map((w, i) => "<div id=w" + i + "><u>" + (i + 1) + "</u>" + w.name + "</div>").join("");
   hud.slots = WEAPONS.map((w, i) => $("w" + i));
 
+  // TINY-OFF settings
   // One entry per setting: the label, the slider range, and how it reads,
   // writes and prints. The row markup and the wiring both come from here.
   const SLIDERS = [
@@ -762,9 +862,11 @@ function bindUi(canvas) {
     ["VOLUME", 0, 100, 1,
       () => settings.volume * 100, (v) => { settings.volume = v / 100; applyVolume(); },
       () => Math.round(settings.volume * 100) + "%"],
+    // TINY-OFF music
     ["MUSIC", 0, 100, 1,
       () => settings.music * 100, (v) => { settings.music = v / 100; applyVolume(); },
       () => Math.round(settings.music * 100) + "%"],
+    // TINY-END
     ["DIFFICULTY", 0, 2, 1,
       () => settings.difficulty, (v) => { settings.difficulty = v; },
       () => DIFFICULTY[settings.difficulty].label],
@@ -783,6 +885,7 @@ function bindUi(canvas) {
     el.oninput = () => { write(Number(el.value)); show(); };
     el.onchange = saveSettings;
   });
+  // TINY-END
 }
 
 // ---------------------------------------------------------------------------
@@ -818,10 +921,12 @@ function buildFlow() {
       if (nx < 0 || ny < 0 || nx >= MAP_SIZE || ny >= MAP_SIZE) continue;
       const ni = ny * MAP_SIZE + nx;
       if (FLOW[ni] !== -1 || solidAt(nx, ny)) continue;
+      // TINY-OFF elevation
       // Both directions have to be walkable, or the field routes enemies at a
       // step they cannot climb and they pile up against it.
       const hz = heightAt(x, y), nz = heightAt(nx, ny);
       if (Math.abs(hz - nz) > CLIMB) continue;
+      // TINY-END
       // Walking back the way the sweep came from walks towards the player.
       FLOW[ni] = d ^ 1;
       queue.push(ni);
@@ -856,12 +961,16 @@ addEventListener("keydown", (e) => {
   if (e.code === "KeyM") toggleMute();
   if (e.code === "Digit1") selectWeapon(0);
   if (e.code === "Digit2") selectWeapon(1);
+  // TINY-OFF chaingun
   if (e.code === "Digit3") selectWeapon(2);
+  // TINY-END
   if (e.code === "KeyE" || e.code === "Space") tryOpenDoors();
   if (e.code === "Enter" || e.code === "Space") {
     if (state === S_DEAD || state === S_CLEAR) {
       restart(state === S_CLEAR);
+      // TINY-OFF melt
       player.melt = 1;
+      // TINY-END
       setState(S_PLAY);
     }
   }
@@ -889,7 +998,9 @@ function installInput(canvas) {
     resumeAudio();
     if (state === S_DEAD || state === S_CLEAR) {
       restart(state === S_CLEAR);
+      // TINY-OFF melt
       player.melt = 1;
+      // TINY-END
       setState(S_PLAY);
     } else if (state === S_PAUSE) {
       setState(S_PLAY);
@@ -925,7 +1036,10 @@ function installInput(canvas) {
     if (document.pointerLockElement !== canvas) return;
     const dir = e.deltaY > 0 ? 1 : -1;
     for (let i = 1; i <= 3; i++) {
+      // TINY-OFF chaingun
       const slot = (player.weapon + dir * i + 9) % 3;
+      // TINY-END
+      // TINY-ON chaingun:       const slot = (player.weapon + dir * i + 9) % 2;
       if (player.have[slot]) { selectWeapon(slot); return; }
     }
   }, { passive: true });
@@ -997,7 +1111,9 @@ function update(dt) {
   player.bob += moved * (running ? 4.6 : 3.4);
   if (player.walked > 1.4) {
     player.walked = 0;
+    // TINY-OFF effects
     sfxStep();
+    // TINY-END
     // Footsteps carry, but not nearly as far as gunfire.
     if (running) wakeFoes(camera.x, camera.y, 7);
   }
@@ -1015,7 +1131,9 @@ function update(dt) {
 const WEAPONS = [
   { name: "PISTOL",   ammo: -1, dmg: 22, cool: 0.30, pellets: 1, spread: 0.00, kick: 0.8, range: 48 },
   { name: "SHOTGUN",  ammo: 1,  dmg: 13, cool: 0.80, pellets: 8, spread: 0.10, kick: 1.6, range: 22 },
+  // TINY-OFF chaingun
   { name: "CHAINGUN", ammo: 0,  dmg: 11, cool: 0.09, pellets: 1, spread: 0.045, kick: 0.6, range: 48 },
+  // TINY-END
 ];
 const AMMO_NAME = ["BULLETS", "SHELLS"];
 
@@ -1041,9 +1159,14 @@ const SHOT_R = 0.16;
 const FOE_KIND = {
   imp:    { hp: 60,  speed: 1.8, reach: 0.95, swing: 1.05, damage: 9,  sight: 15, ranged: 0 },
   caster: { hp: 45,  speed: 1.2, reach: 7.0,  swing: 1.9,  damage: 12, sight: 17, ranged: 1 },
+  // TINY-OFF brute
   brute:  { hp: 150, speed: 1.05, reach: 1.25, swing: 1.5, damage: 22, sight: 13, ranged: 0 },
+  // TINY-END
 };
+// TINY-OFF brute
 const FOE_INDEX = { imp: 0, caster: 1, brute: 2 };
+// TINY-END
+// TINY-ON brute: const FOE_INDEX = { imp: 0, caster: 1 };
 
 const BASE_SEED = 1337;
 const START = [0, 0];
@@ -1051,9 +1174,15 @@ const FOE_SPAWNS = [];
 
 const player = {
   hp: 100, armour: 0, kills: 0, hurt: 0, dead: 0, cool: 0, gun: 0, flash: 0,
+  // TINY-OFF melt
   firing: false, walked: 0, bob: 0, shake: 0, hurtDir: 0, stam: 1, switching: 0, melt: 0,
+  // TINY-END
+  // TINY-ON melt:   firing: false, walked: 0, bob: 0, shake: 0, hurtDir: 0, stam: 1, switching: 0,
   z: 0,                    // elevation of the ground underfoot
+  // TINY-OFF chaingun
   weapon: 0, have: [true, false, false], ammo: [50, 0], keys: [false, false],
+  // TINY-END
+  // TINY-ON chaingun:   weapon: 0, have: [true, false], ammo: [50, 0], keys: [false, false],
 };
 
 let foes = [];
@@ -1062,11 +1191,15 @@ let doors = [];
 let shots = [];
 let parts = [];
 let level = 1;
+// TINY-OFF best
 let best = 1;
+// TINY-END
 
 // The way out, and the room that does not let you leave until it is empty.
 const exitAt = [0, 0];
+// TINY-OFF arena
 let arena = null;
+// TINY-END
 
 // --- particles ---------------------------------------------------------------
 
@@ -1103,6 +1236,7 @@ function updateParts(dt) {
 
 // --- decals ------------------------------------------------------------------
 
+// TINY-OFF blood
 // Blood stays where it was spilt. The shader darkens the floor around each one,
 // so a fight leaves a mark you walk back through later.
 const MAX_DECALS = 16;
@@ -1112,6 +1246,7 @@ function spawnDecal(x, y) {
   decals.push({ x, y, r: 0.5 + Math.random() * 0.35 });
   if (decals.length > MAX_DECALS) decals.shift();
 }
+// TINY-END
 
 // --- doors -------------------------------------------------------------------
 
@@ -1135,8 +1270,12 @@ function tryOpenDoors() {
     if (d.open > 0) continue;
     if (Math.hypot(d.cx + 0.5 - camera.x, d.cy + 0.5 - camera.y) > 1.4) continue;
     if (d.key >= 0 && !player.keys[d.key]) {
+      // TINY-OFF effects
       sfxLocked();
+      // TINY-END
+      // TINY-OFF notes
       flashHud(d.key === 0 ? "NEED THE RED KEY" : "NEED THE BLUE KEY");
+      // TINY-END
       continue;
     }
     d.moving = true;
@@ -1147,8 +1286,13 @@ function tryOpenDoors() {
 // --- pickups -----------------------------------------------------------------
 
 // kind: 0 health, 1 bullets, 2 shells, 3 shotgun, 4 chaingun, 5 red key, 6 blue key
+// TINY-OFF notes
+// TINY-OFF chaingun
 const PICKUP_TEXT = ["+25 HEALTH", "+20 BULLETS", "+8 SHELLS", "SHOTGUN", "CHAINGUN",
                      "RED KEY", "BLUE KEY", "+50 ARMOUR"];
+// TINY-END
+// TINY-ON chaingun: const PICKUP_TEXT = ["+25 HEALTH", "+20 BULLETS", "+8 SHELLS", "SHOTGUN", "", "RED KEY", "BLUE KEY", "+50 ARMOUR"];
+// TINY-END
 
 function takePickup(p) {
   if (p.kind === 0) {
@@ -1158,8 +1302,12 @@ function takePickup(p) {
     player.ammo[0] += 20;
   } else if (p.kind === 2) {
     player.ammo[1] += 8;
+  // TINY-OFF chaingun
   } else if (p.kind === 3 || p.kind === 4) {
     const slot = p.kind === 3 ? 1 : 2;
+  // TINY-END
+  // TINY-ON chaingun:   } else if (p.kind === 3) {
+  // TINY-ON chaingun:     const slot = 1;
     if (player.have[slot]) {
       player.ammo[WEAPONS[slot].ammo] += slot === 1 ? 8 : 30;
     } else {
@@ -1173,11 +1321,16 @@ function takePickup(p) {
   } else {
     player.keys[p.kind - 5] = true;
   }
+  // TINY-OFF notes
   flashHud(PICKUP_TEXT[p.kind]);
+  // TINY-END
+  // TINY-OFF effects
   sfxPickup(p.kind >= 3);
+  // TINY-END
   return true;
 }
 
+// TINY-OFF arena
 // Stepping into the arena shuts the door behind you and wakes everything
 // inside it. It opens again when the room is empty.
 function updateArena() {
@@ -1192,7 +1345,9 @@ function updateArena() {
     setBit(SOLID, d.cx, d.cy);
     setBit(DOORBIT, d.cx, d.cy);
     sfxDoor(d.cx + 0.5, d.cy + 0.5);
+    // TINY-OFF notes
     flashHud("SEALED IN");
+    // TINY-END
     for (const f of foes) {
       if (f.hp > 0 && arena.cells.has(Math.floor(f.y) * MAP_SIZE + Math.floor(f.x))) {
         f.alert = 30;
@@ -1208,10 +1363,14 @@ function updateArena() {
       arena.sealed = false;
       arena.door.moving = true;
       sfxDoor(arena.door.cx + 0.5, arena.door.cy + 0.5);
+      // TINY-OFF notes
       flashHud("THE WAY IS OPEN");
+      // TINY-END
     }
   }
 }
+
+// TINY-END
 
 function reachedExit() {
   return Math.hypot(exitAt[0] - camera.x, exitAt[1] - camera.y) < 0.8;
@@ -1219,8 +1378,12 @@ function reachedExit() {
 
 function updatePickups(dt) {
   if (reachedExit()) {
+    // TINY-OFF best
     recordBest(level + 1);
+    // TINY-END
+    // TINY-OFF effects
     sfxClear();
+    // TINY-END
     setState(S_CLEAR);
     return;
   }
@@ -1313,7 +1476,9 @@ function buildLevel(seed) {
   }
 
   // Raised ground first, then crates on whatever is left flat.
+  // TINY-OFF elevation
   raiseGround(openCells(), 22 + tier * 5);
+  // TINY-END
   scatterCover(26 + tier * 6, openCells());
 
   // Enemies over the remaining spots, casters appearing from level two and
@@ -1330,8 +1495,11 @@ function buildLevel(seed) {
       if (!fits(x, y, FOE_R)) continue;
       const roll = rand();
       let kind = "imp";
+      // TINY-OFF brute
       if (level > 2 && roll < 0.10 + tier * 0.035) kind = "brute";
       else if (level > 1 && roll < 0.30 + tier * 0.05) kind = "caster";
+      // TINY-END
+      // TINY-ON brute:       if (level > 1 && roll < 0.30 + tier * 0.05) kind = "caster";
       FOE_SPAWNS.push([x, y, kind]);
     }
   }
@@ -1348,6 +1516,7 @@ function buildLevel(seed) {
   exitAt[0] = (far % MAP_SIZE) + 0.5;
   exitAt[1] = Math.floor(far / MAP_SIZE) + 0.5;
 
+  // TINY-OFF arena
   // An arena: the last unlocked door on the way to the exit shuts behind you
   // and stays shut until the room is clear. Built from the region the door
   // seals off, so it works the same in a cave as in a block of rooms.
@@ -1363,11 +1532,14 @@ function buildLevel(seed) {
     arena = { door: d, cells: behind, armed: true, sealed: false };
     break;
   }
+  // TINY-END
 
   // Supplies, weighted by what the player is short of at this point in the run.
   const supply = [0, 0, 1, 1, 2, 7];
   if (level === 1) supply.push(3);
+  // TINY-OFF chaingun
   else if (level === 3) supply.push(4);
+  // TINY-END
   else supply.push(rand() < 0.5 ? 1 : 2);
   for (const kind of supply) {
     if (pickups.length >= MAX_PICKUPS) break;
@@ -1406,6 +1578,7 @@ function cleared() {
   return state === S_CLEAR;
 }
 
+// TINY-OFF notes
 function flashHud(text) {
   if (!hud.note) return;
   hud.note.textContent = text;
@@ -1413,7 +1586,9 @@ function flashHud(text) {
   clearTimeout(hud.noteTimer);
   hud.noteTimer = setTimeout(() => hud.note.classList.add("off"), 1600);
 }
+// TINY-END
 
+// TINY-OFF polish
 // Health drives the colour, the brow and the tilt; a recent hit turns the face
 // towards whatever hit you, so it doubles as a damage indicator.
 function updateFace() {
@@ -1429,6 +1604,8 @@ function updateFace() {
   hud.face.style.filter = player.hp === 0 ? "grayscale(1) brightness(.45)" : "none";
 }
 
+// TINY-END
+
 function updateHud() {
   if (!hud.hp) return;
   const w = WEAPONS[player.weapon];
@@ -1438,24 +1615,36 @@ function updateHud() {
   hud.ammoName.textContent = w.ammo < 0 ? "" : AMMO_NAME[w.ammo];
   hud.kills.textContent = player.kills + "/" + foes.length;
   hud.lvl.textContent = String(level);
+  // TINY-OFF polish
   hud.stam.style.width = Math.round(player.stam * 100) + "%";
+  // TINY-END
+  // TINY-OFF best
   if (hud.best) hud.best.textContent = best > 1 ? "FURTHEST: LEVEL " + best : "";
+  // TINY-END
   hud.keyRed.classList.toggle("have", player.keys[0]);
   hud.keyBlue.classList.toggle("have", player.keys[1]);
-  for (let i = 0; i < 3; i++) {
+  // Driven off the table rather than a literal 3, because the slot elements are
+  // built from that table too and the two silently disagreeing is a crash.
+  for (let i = 0; i < WEAPONS.length; i++) {
     hud.slots[i].classList.toggle("dim", !player.have[i]);
     hud.slots[i].classList.toggle("on", player.weapon === i);
   }
+  // TINY-OFF polish
   updateFace();
+  // TINY-END
 }
 
 function selectWeapon(slot) {
   if (slot === player.weapon || !player.have[slot]) return;
   player.weapon = slot;
   // The gun drops out of frame and comes back up, and cannot fire on the way.
+  // TINY-OFF polish
   player.switching = 1;
+  // TINY-END
   player.cool = Math.max(player.cool, 0.3);
+  // TINY-OFF effects
   sfxSwitch();
+  // TINY-END
   updateHud();
 }
 
@@ -1477,7 +1666,9 @@ function hurtPlayer(amount) {
   }
   player.hp = Math.max(0, Math.round(player.hp - amount));
   player.hurt = 1;
+  // TINY-OFF polish
   player.shake = Math.min(1, player.shake + amount * 0.03);
+  // TINY-END
   if (player.hp === 0) {
     keys.clear();
     sfxDie();
@@ -1493,7 +1684,9 @@ function hurtPlayer(amount) {
 function fire() {
   const w = WEAPONS[player.weapon];
   if (w.ammo >= 0 && player.ammo[w.ammo] <= 0) {
+    // TINY-OFF effects
     sfxDryFire();
+    // TINY-END
     player.cool = 0.4;
     // Fall back to the pistol rather than leaving the player holding nothing.
     if (player.have[0]) selectWeapon(0);
@@ -1504,7 +1697,9 @@ function fire() {
   player.cool = w.cool;
   player.gun = w.kick;
   player.flash = 1;
+  // TINY-OFF polish
   player.shake = Math.min(1, player.shake + w.kick * 0.12);
+  // TINY-END
   sfxShoot(player.weapon);
   wakeFoes(camera.x, camera.y, 18);   // firing is loud
 
@@ -1550,7 +1745,9 @@ function damageFoe(f, amount, dx, dy) {
   sfxImpDie(f.x, f.y, FOE_INDEX[f.kind]);
   spawnPart(f.x, f.y, 0.5, 0, 3.4, 10);
   player.kills++;
+  // TINY-OFF blood
   spawnDecal(f.x, f.y);
+  // TINY-END
   updateHud();
 }
 
@@ -1653,7 +1850,9 @@ function updateFoes(dt) {
 
     if (seen < f.spec.reach) {
       if (f.swing === 0) {
+        // TINY-OFF effects
         sfxSwing(f.x, f.y);
+        // TINY-END
         hurtFromDirection(f.spec.damage, f.x, f.y);
         f.swing = f.spec.swing;
       }
@@ -1685,8 +1884,10 @@ function updateEffects(dt) {
   player.gun = Math.max(0, player.gun - dt * 5);
   player.flash = Math.max(0, player.flash - dt * 9);
   player.hurt = Math.max(0, player.hurt - dt * 1.6);
+  // TINY-OFF polish
   player.shake = Math.max(0, player.shake - dt * 2.5);
   player.switching = Math.max(0, player.switching - dt * 3.2);
+  // TINY-END
   const ground = groundUnder(camera.x, camera.y);
   player.z += (ground - player.z) * Math.min(1, dt * 12);
   // Stamina comes back only once you stop sprinting.
@@ -1708,7 +1909,10 @@ function restart(advance) {
   if (advance) {
     level++;
   } else {
+    // TINY-OFF chaingun
     player.have = [true, false, false];
+    // TINY-END
+    // TINY-ON chaingun:     player.have = [true, false];
     player.ammo = [50, 0];
     player.weapon = 0;
     player.armour = 0;
@@ -1730,14 +1934,18 @@ function restart(advance) {
   player.keys = [false, false];
   shots = [];
   parts = [];
+  // TINY-OFF blood
   decals = [];
+  // TINY-END
   player.stam = 1;
   player.switching = 0;
   player.z = groundUnder(START[0], START[1]);
   flowFrom = -1;
   spawnFoes();
   updateHud();
+  // TINY-OFF music
   if (audio) audio.music.gain.setValueAtTime(MUSIC_GAIN, audio.ctx.currentTime);
+  // TINY-END
 }
 
 // ---------------------------------------------------------------------------
@@ -1746,9 +1954,12 @@ function restart(advance) {
 // sequencer reading packed pattern strings, one character per sixteenth.
 // ---------------------------------------------------------------------------
 
+// TINY-OFF music
 const BPM = 150;
 const STEPS = 16;
+// TINY-END
 const ROOT = 55;                          // A1, the tonic everything hangs off
+// TINY-OFF music
 const MUSIC_GAIN = 0.26;
 
 // One character per step. "." is a rest, anything else is a semitone offset in
@@ -1772,10 +1983,13 @@ const BARS = 16;
 // Sixteenths are nudged off the grid in alternation, which is the difference
 // between a drum machine and something with a pulse.
 const SWING = 0.12;
+// TINY-END
 
 let audio = null;
 let muted = false;
 
+// Shared with the pickup chime and the level clear fanfare, so it outlives the
+// song: cutting music must not take the note table with it.
 function noteHz(semi) {
   return ROOT * Math.pow(2, semi / 12);
 }
@@ -1834,6 +2048,7 @@ function initAudio() {
   bus.connect(master);
   bus.connect(verb);
 
+  // TINY-OFF music
   const music = ctx.createGain();
   music.gain.value = MUSIC_GAIN;
   music.connect(master);
@@ -1841,14 +2056,18 @@ function initAudio() {
   musicSend.gain.value = 0.18;      // the music sits drier than the world
   music.connect(musicSend);
   musicSend.connect(verb);
+  // TINY-END
 
   // A second of white noise, reused by every effect that needs it.
   const noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
   const data = noise.getChannelData(0);
   for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
 
+  // TINY-OFF music
   audio = { ctx, master, music, bus, verb, wet, noise, next: ctx.currentTime + 0.1, step: 0 };
   setInterval(schedule, 25);
+  // TINY-END
+  // TINY-ON music:   audio = { ctx, master, bus, verb, wet, noise };
 }
 
 function resumeAudio() {
@@ -1858,7 +2077,9 @@ function resumeAudio() {
 function applyVolume() {
   if (audio) {
     audio.master.gain.value = masterLevel();
+    // TINY-OFF music
     audio.music.gain.value = MUSIC_GAIN * settings.music * (state === S_PLAY ? 1 : 0.35);
+    // TINY-END
   }
 }
 
@@ -1961,19 +2182,23 @@ function sfxShoot(weapon) {
   }
 }
 
+// TINY-OFF effects
 function sfxDryFire() {
   if (!audio) return;
   const t = audio.ctx.currentTime;
   burst(t, 0.25, 0.03, "highpass", 3000);
   tone("square", 140, t, 0.08, 0.001, 0.03);
 }
+// TINY-END
 
+// TINY-OFF effects
 function sfxSwitch() {
   if (!audio) return;
   const t = audio.ctx.currentTime;
   burst(t, 0.2, 0.05, "bandpass", 2200);
   tone("square", 420, t, 0.1, 0.002, 0.06);
 }
+// TINY-END
 
 function sfxImpHit(x, y) {
   if (!audio) return;
@@ -2034,12 +2259,14 @@ function sfxGrowl(x, y, kind) {
   else growlVoice(t, x, y, 120 + r * 40, 74, 0.55, 520, 0.6);
 }
 
+// TINY-OFF effects
 function sfxSwing(x, y) {
   if (!audio) return;
   const t = audio.ctx.currentTime;
   const f = burst(t, 0.6, 0.18, "bandpass", 2400, fromWorld(x, y));
   f.frequency.exponentialRampToValueAtTime(400, t + 0.18);
 }
+// TINY-END
 
 // A caster winding up. Deliberately distinct from anything else in the mix,
 // because it is the cue to break line of sight.
@@ -2073,9 +2300,12 @@ function sfxDie() {
   const t = audio.ctx.currentTime;
   const o = tone("sawtooth", 200, t, 0.55, 0.02, 1.6);
   o.frequency.exponentialRampToValueAtTime(28, t + 1.6);
+  // TINY-OFF music
   audio.music.gain.linearRampToValueAtTime(0.02, t + 1.2);
+  // TINY-END
 }
 
+// TINY-OFF effects
 function sfxClear() {
   if (!audio) return;
   const t = audio.ctx.currentTime;
@@ -2083,7 +2313,9 @@ function sfxClear() {
     tone("square", noteHz(24 + semi), t + i * 0.11, 0.22, 0.01, 0.3);
   });
 }
+// TINY-END
 
+// TINY-OFF effects
 // Rising for a pickup, and a brighter one for a weapon so the two are not
 // confused across a room.
 function sfxPickup(big) {
@@ -2094,6 +2326,7 @@ function sfxPickup(big) {
     tone("square", noteHz(36 + semi), t + i * 0.06, 0.18, 0.005, 0.14);
   });
 }
+// TINY-END
 
 function sfxDoor(x, y) {
   if (!audio) return;
@@ -2104,13 +2337,16 @@ function sfxDoor(x, y) {
   tone("triangle", 70, t, 0.25, 0.05, 0.7, out);
 }
 
+// TINY-OFF effects
 function sfxLocked() {
   if (!audio) return;
   const t = audio.ctx.currentTime;
   tone("square", 160, t, 0.22, 0.002, 0.09);
   tone("square", 120, t + 0.11, 0.22, 0.002, 0.09);
 }
+// TINY-END
 
+// TINY-OFF effects
 function sfxStep() {
   if (!audio) return;
   // A lowpass this low throws away most of the noise, so the burst has to be
@@ -2119,8 +2355,11 @@ function sfxStep() {
   burst(t, 1.1, 0.06, "lowpass", 520);
   tone("sine", 72, t, 0.10, 0.002, 0.08);
 }
+// TINY-END
 
 // --- the song --------------------------------------------------------------
+
+// TINY-OFF music
 
 function bassVoice(t, freq) {
   const o = audio.ctx.createOscillator();
@@ -2218,6 +2457,7 @@ function schedule() {
   }
 }
 
+// TINY-END
 // ---------------------------------------------------------------------------
 // Shader. Fullscreen triangle in the vertex stage, DDA raycast in the fragment
 // stage. Screen space is y-down, so the horizon sits at ndc.y == 0 and walls
@@ -2243,7 +2483,7 @@ struct Uniforms {
   eyeZ   : f32,      // where the eye is, which moves as the player climbs
   weapon : f32,      // which gun is in your hands
   hurtDir: f32,      // bearing of the last hit, relative to the view
-  shake  : f32,      // shake amount, also drives the damage vignette
+  shake  : f32,      // written, never read; kept because the header layout
   keys   : f32,      // bit 0 red, bit 1 blue, for the minimap legend
   exitX  : f32,      // the way out, as two scalars rather than a vec2f: a
   exitY  : f32,      // vec2f here would be moved to the next eight byte
@@ -2264,15 +2504,19 @@ struct Uniforms {
   picks : array<vec4f, 12>,   // xy pos, z kind, w bob phase (negative = taken)
   shots : array<vec4f, 10>,   // xy pos, z unused, w life
   parts : array<vec4f, 40>,   // xy pos, z height, w = kind + life
+  // TINY-OFF blood
   decals: array<vec4f, 16>,   // xy pos, z radius, w unused (negative = empty)
+  // TINY-END
 };
 
 @group(0) @binding(0) var<uniform> U : Uniforms;
 // The frame before the last scene change, held so the wipe has something to
 // slide. Without it the only thing available to slide is darkness, and a
 // black curtain covering the screen is just a black screen.
+// TINY-OFF melt
 @group(0) @binding(1) var snapTex : texture_2d<f32>;
 @group(0) @binding(2) var snapSmp : sampler;
+// TINY-END
 
 const MAP_SIZE : i32 = 64;
 const MAX_STEPS : i32 = 200;
@@ -2314,8 +2558,11 @@ fn solid(cell : vec2i) -> bool {
 
 // The elevation of the floor in this cell, from the two height planes.
 fn groundAt(cell : vec2i) -> f32 {
+  // TINY-OFF elevation
   if (outside(cell)) { return 0.0; }
   return (select(0.0, 1.0, bitOf(3, cell)) + select(0.0, 2.0, bitOf(4, cell))) * STEP_H;
+  // TINY-END
+  // TINY-ON elevation:   return 0.0;
 }
 
 // How far the door in this cell has slid up, and which key it wants. Doors are
@@ -2434,6 +2681,7 @@ fn groundTex(p : vec2f, up : bool) -> vec3f {
          + vec3f(0.62, 0.56, 0.42) * lamp;
   }
   var col = vec3f(0.19, 0.18, 0.21) * (0.6 + 0.55 * g) * (0.72 + 0.28 * grout);
+  // TINY-OFF blood
   // Blood pools where something died and stays there for the rest of the level.
   for (var i = 0u; i < 16u; i = i + 1u) {
     let d = U.decals[i];
@@ -2444,6 +2692,7 @@ fn groundTex(p : vec2f, up : bool) -> vec3f {
       col = mix(col, vec3f(0.16, 0.02, 0.02), edge * 0.85);
     }
   }
+  // TINY-END
   return col;
 }
 
@@ -2577,6 +2826,7 @@ fn casterShape(u : f32, v : f32, hurt : f32, t : f32, idle : f32) -> vec4f {
   return vec4f(mix(round3(c, u), vec3f(1.0), hurt), 1.0);
 }
 
+// TINY-OFF brute
 // The brute: twice the width of an imp, armour plates, and a head sunk between
 // shoulders. It rocks side to side as it walks rather than swinging legs.
 fn bruteShape(u : f32, v : f32, hurt : f32, gait : f32, idle : f32) -> vec4f {
@@ -2625,6 +2875,8 @@ fn bruteShape(u : f32, v : f32, hurt : f32, gait : f32, idle : f32) -> vec4f {
   return vec4f(mix(round3(c, uu), vec3f(1.0), hurt), 1.0);
 }
 
+// TINY-END
+
 // Pickups. Small, bright, and shaped enough to tell apart across a room.
 fn pickShape(u : f32, v : f32, kind : i32) -> vec4f {
   let au = abs(u);
@@ -2647,6 +2899,7 @@ fn pickShape(u : f32, v : f32, kind : i32) -> vec4f {
     if (v > 0.24 && v < 0.44 && u > 0.30 && u < 0.62) { return vec4f(0.34, 0.22, 0.14, 1.0); }
     return vec4f(0.0);
   }
+  // TINY-OFF chaingun
   if (kind == 4) {                                   // chaingun: barrel cluster
     if (v > 0.36 && v < 0.62 && au < 0.80) {
       let ring = fract(u * 5.0);
@@ -2654,6 +2907,7 @@ fn pickShape(u : f32, v : f32, kind : i32) -> vec4f {
     }
     return vec4f(0.0);
   }
+  // TINY-END
   // keys: a card with a bit cut out of it
   let c = select(vec3f(0.35, 0.55, 0.95), vec3f(0.90, 0.25, 0.22), kind == 5);
   if (au < 0.46 && v > 0.26 && v < 0.74) {
@@ -2676,7 +2930,10 @@ fn weapon(ndc : vec2f, aspect : f32, bobx : f32, boby : f32) -> vec4f {
   let which = i32(U.weapon + 0.5);
   // Recoil pushes the gun down; a weapon change takes it all the way out and
   // brings the new one back up.
+  // TINY-OFF polish
   let drop = U.gun * 0.16 + sin(U.switching * 3.14159) * 0.85;
+  // TINY-END
+  // TINY-ON polish:   let drop = U.gun * 0.16;
   let q = vec2f(ndc.x * aspect - 0.03 - bobx,
                 (1.0 - U.hudTop - ndc.y) * 1.5 - 0.02 + drop - boby);
   let ax = abs(q.x);
@@ -2711,6 +2968,7 @@ fn weapon(ndc : vec2f, aspect : f32, bobx : f32, boby : f32) -> vec4f {
       lit = select(-1.0, 1.0, q.y > 0.70);
     }
     if (q.y > 0.72 && q.y < 0.76 && ax < 0.09) { c = vec3f(0.05, 0.05, 0.06); a = 1.0; }
+  // TINY-OFF chaingun
   } else if (which == 2) {
     // Chaingun: heavy body, six barrels that spin while it is firing.
     if (q.y >= 0.14 && q.y < 0.46 && ax < 0.19) {
@@ -2731,6 +2989,8 @@ fn weapon(ndc : vec2f, aspect : f32, bobx : f32, boby : f32) -> vec4f {
     }
     if (q.y > 0.68 && q.y < 0.72 && ax < 0.13) { c = vec3f(0.05, 0.05, 0.06); a = 1.0; }
   } else {
+  // TINY-END
+  // TINY-ON chaingun:   } else {
     // Pistol: slide, frame, a front sight and an ejection port.
     if (q.y >= 0.15 && q.y < 0.34 && ax < 0.10) {
       c = vec3f(0.23, 0.22, 0.25);
@@ -2755,7 +3015,10 @@ fn weapon(ndc : vec2f, aspect : f32, bobx : f32, boby : f32) -> vec4f {
   c = c * (1.0 + lit * 0.22);
 
   // A shaped flash: a bright core with four spikes, rather than a blob.
+  // TINY-OFF chaingun
   let muzzleY = select(0.62, select(0.78, 0.74, which == 2), which >= 1);
+  // TINY-END
+  // TINY-ON chaingun:   let muzzleY = select(0.62, 0.78, which >= 1);
   let m = vec2f(q.x, q.y - muzzleY);
   let r = length(m);
   let spikes = 0.55 + 0.45 * abs(cos(atan2(m.y, m.x) * 2.0));
@@ -2765,6 +3028,7 @@ fn weapon(ndc : vec2f, aspect : f32, bobx : f32, boby : f32) -> vec4f {
 
 // --- minimap ----------------------------------------------------------------
 
+// TINY-OFF minimap
 // Drawn straight from the same bits the renderer walks, north up, with the
 // player fixed in the middle. Returns premultiplied colour and coverage.
 fn minimap(frag : vec2f) -> vec4f {
@@ -2820,6 +3084,7 @@ fn minimap(frag : vec2f) -> vec4f {
   }
   return vec4f(col, alpha);
 }
+// TINY-END
 
 @vertex
 fn vs(@builtin(vertex_index) i : u32) -> @builtin(position) vec4f {
@@ -2831,8 +3096,11 @@ fn vs(@builtin(vertex_index) i : u32) -> @builtin(position) vec4f {
 @fragment
 fn fs(@builtin(position) frag : vec4f) -> @location(0) vec4f {
   let aspect = U.res.x / U.res.y;
+  // TINY-OFF polish
   let shake = vec2f(U.shakeX, U.shakeY);
   let ndc = frag.xy / U.res * 2.0 - 1.0 + shake;
+  // TINY-END
+  // TINY-ON polish:   let ndc = frag.xy / U.res * 2.0 - 1.0;
   let screenX = ndc.x * aspect * U.fov;
   // Pitch is a shear, not a rotation: it slides the horizon instead of
   // tilting the camera, which is what keeps the columns vertical. The walk
@@ -2851,15 +3119,19 @@ fn fs(@builtin(position) frag : vec4f) -> @location(0) vec4f {
   // Replacing that with a black curtain removed the distortion but not the
   // problem: a curtain that covers the screen is a black screen, so every
   // transition began with a flash of black before anything appeared to melt.
+  // TINY-OFF melt
   let meltCol = floor(frag.x / 5.0);
   let meltRnd = hash21(vec2f(meltCol, 3.0));
   let meltPhase = max((1.0 - U.melt) * (1.15 + 0.55 * meltRnd) - 0.22 * meltRnd, 0.0);
   let meltFall = meltPhase * meltPhase * U.res.y * 1.1;
   let meltY = frag.y - meltFall;
+  // TINY-END
   // Sampled unconditionally: a texture read inside a branch is not allowed to
   // pick its own mip level, and this shader has no mips to pick from anyway.
+  // TINY-OFF melt
   let meltOld = textureSampleLevel(snapTex, snapSmp,
     vec2f(frag.x, clamp(meltY, 0.0, U.res.y - 1.0)) / U.res, 0.0).rgb;
+  // TINY-END
   let sy = ndc.y + U.pitch + bobY;
 
   let dir = vec2f(cos(U.ang), sin(U.ang));
@@ -2962,6 +3234,7 @@ fn fs(@builtin(position) frag : vec4f) -> @location(0) vec4f {
       break;
     }
 
+    // TINY-OFF elevation
     // Open ground. A step up shows its riser; a step down shows nothing from
     // this side, because that face points away from the eye.
     let nextZ = groundAt(cell);
@@ -2974,6 +3247,7 @@ fn fs(@builtin(position) frag : vec4f) -> @location(0) vec4f {
       }
     }
     floorZ = nextZ;
+    // TINY-END
   }
 
   dist = max(dist, 0.0001);
@@ -2982,12 +3256,16 @@ fn fs(@builtin(position) frag : vec4f) -> @location(0) vec4f {
   if (hit == 4) {
     // --- a floor, at whatever elevation this cell sits ---
     let pt = U.cam + rd * dist;
+    // TINY-OFF elevation
     let lift = faceZ / STEP_H;          // 0 on the ground, 1..3 on a platform
+    // TINY-END
     var base = groundTex(pt, false);
+    // TINY-OFF elevation
     if (lift > 0.5) {
       // Raised ground is a different material, so a step reads as a step.
       base = mix(base, vec3f(0.30, 0.27, 0.22) * (0.7 + 0.16 * lift), 0.55);
     }
+    // TINY-END
     color = mix(base, vec3f(0.24, 0.23, 0.26), smoothstep(7.0, 20.0, dist));
   } else if (hit == 0) {
     // --- nothing but ceiling ---
@@ -3007,7 +3285,10 @@ fn fs(@builtin(position) frag : vec4f) -> @location(0) vec4f {
     let hitPos = U.cam + rd * dist;
     let along = select(hitPos.x, hitPos.y, side == 0);
     // Height up the face, measured from its own foot.
+    // TINY-OFF elevation
     let span = select(1.0 - faceZ, select(LOW_H, STEP_H, hit == 5), hit != 1);
+    // TINY-END
+    // TINY-ON elevation:     let span = select(1.0 - faceZ, LOW_H, hit != 1);
     let footSy = (U.eyeZ - faceZ) * 2.0 * WALL_HEIGHT / dist;
     let topSy = (U.eyeZ - faceZ - span) * 2.0 * WALL_HEIGHT / dist;
     let height = clamp((footSy - sy) / max(footSy - topSy, 0.0001), 0.0, 1.0);
@@ -3066,8 +3347,11 @@ fn fs(@builtin(position) frag : vec4f) -> @location(0) vec4f {
     let idle = sin(U.time * 1.7 + f32(i));
     let uu = off / kindR;
     var s : vec4f;
+    // TINY-OFF brute
     if (kind > 1.5) { s = bruteShape(uu, v, hurt, gait, idle); }
     else if (kind > 0.5) { s = casterShape(uu, v, hurt, U.time + f32(i), idle); }
+    // TINY-END
+    // TINY-ON brute:     if (kind > 0.5) { s = casterShape(uu, v, hurt, U.time + f32(i), idle); }
     else { s = impShape(uu, v, hurt, gait, idle); }
     if (s.a > 0.5) {
       color = s.rgb * (1.0 + U.flash * 1.6 * exp(-fdepth * 0.45));
@@ -3185,6 +3469,7 @@ fn fs(@builtin(position) frag : vec4f) -> @location(0) vec4f {
   color = color + vec3f(0.30, 0.22, 0.10) * U.flash * 0.22;
   color = mix(color, vec3f(0.55, 0.03, 0.02), U.hurt * 0.5);
 
+  // TINY-OFF polish
   // Damage from off screen shows as a glow on the side it came from.
   if (U.hurt > 0.01) {
     let edge = smoothstep(0.35, 1.0, length(ndc));
@@ -3192,11 +3477,15 @@ fn fs(@builtin(position) frag : vec4f) -> @location(0) vec4f {
     let toward = cos(bearing - U.hurtDir);
     color = color + vec3f(0.7, 0.05, 0.05) * edge * max(toward, 0.0) * U.hurt * 0.8;
   }
+  // TINY-END
 
   color = mix(color, vec3f(0.14, 0.0, 0.0), U.dead);
 
   // Crosshair, on the exact centre ray the shot is fired down.
+  // TINY-OFF polish
   let cross = abs((ndc - shake) * vec2f(aspect, 1.0));
+  // TINY-END
+  // TINY-ON polish:   let cross = abs(ndc * vec2f(aspect, 1.0));
   if (max(cross.x, cross.y) < 0.014 && min(cross.x, cross.y) < 0.0018) {
     color = color + vec3f(0.45, 0.5, 0.45) * (1.0 - U.dead);
   }
@@ -3205,10 +3494,14 @@ fn fs(@builtin(position) frag : vec4f) -> @location(0) vec4f {
   var outColor = pow(max(color, vec3f(0.0)), vec3f(1.0 / 1.6));
   // Wherever the outgoing frame has not yet slid past, show it instead. It is
   // already gamma encoded, so it goes in after the conversion above.
+  // TINY-OFF melt
   if (U.melt > 0.0 && meltY >= 0.0) { outColor = meltOld; }
+  // TINY-END
 
+  // TINY-OFF minimap
   let mm = minimap(frag.xy);
   outColor = mix(outColor, mm.rgb, mm.a * (1.0 - U.dead * 0.7));
+  // TINY-END
 
   return vec4f(outColor, 1.0);
 }
@@ -3273,10 +3566,15 @@ async function main() {
   //   760  pickups, 12 * vec4
   //   808  shots,   10 * vec4
   //   848  parts,   40 * vec4
+  // TINY-OFF blood
   //   1008 decals,  16 * vec4
+  // TINY-END
   const O_SOLID = 32, O_LOW = 160, O_DOOR = 288, O_HGT0 = 416, O_HGT1 = 544,
         O_FOES = 672, O_DOORS = 728, O_PICKS = 760, O_SHOTS = 808, O_PARTS = 848,
+        // TINY-OFF blood
         O_DECALS = 1008, U_FLOATS = 1072;
+        // TINY-END
+        // TINY-ON blood:         U_FLOATS = 1008;
   const uniformData = new ArrayBuffer(U_FLOATS * 4);
   const uf = new Float32Array(uniformData);
   const uu = new Uint32Array(uniformData);
@@ -3286,26 +3584,32 @@ async function main() {
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
 
+  // TINY-OFF melt
   const sampler = device.createSampler({ magFilter: "linear", minFilter: "linear" });
   let snapshot = null;
+  // TINY-END
   let bindGroup = null;
 
   function resize() {
     const dpr = Math.min(devicePixelRatio || 1, 2);
     canvas.width = Math.max(1, Math.floor(canvas.clientWidth * dpr));
     canvas.height = Math.max(1, Math.floor(canvas.clientHeight * dpr));
+    // TINY-OFF melt
     if (snapshot) snapshot.destroy();
     snapshot = device.createTexture({
       size: [canvas.width, canvas.height],
       format,
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     });
+    // TINY-END
     bindGroup = device.createBindGroup({
       layout: pipeline.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: { buffer: uniformBuffer } },
+        // TINY-OFF melt
         { binding: 1, resource: snapshot.createView() },
         { binding: 2, resource: sampler },
+        // TINY-END
       ],
     });
   }
@@ -3341,7 +3645,9 @@ async function main() {
     if (state === S_PLAY) {
       update(dt);
       buildFlow();
+      // TINY-OFF arena
       updateArena();
+      // TINY-END
       updateFoes(dt);
       updateShots(dt);
       updatePickups(dt);
@@ -3355,10 +3661,14 @@ async function main() {
     // The wipe advances in every state, including the menu. Tying it to the
     // states that update the world left it stuck at fully covered on any screen
     // that does not.
+    // TINY-OFF melt
     player.melt = Math.max(0, player.melt - dt * 0.8);
+    // TINY-END
 
     const time = t * 0.001;
+    // TINY-OFF polish
     const shake = player.shake * player.shake * 0.06;
+    // TINY-END
     uf[0] = canvas.width;
     uf[1] = canvas.height;
     uf[2] = camera.fov;
@@ -3372,20 +3682,30 @@ async function main() {
     uf[10] = player.hurt;
     uf[11] = player.dead;
     uf[12] = player.bob;
+    // TINY-OFF polish
     uf[13] = Math.sin(time * 47.0) * shake;
     uf[14] = Math.cos(time * 39.0) * shake;
+    // TINY-END
     // The status bar covers the bottom of the viewport; tell the shader how
     // much, so the gun is drawn above it rather than behind it.
     uf[15] = state === S_MENU ? 0 : (78 * (devicePixelRatio || 1) / canvas.height) * 2;
     uf[16] = player.z + 0.5;      // eye height above the world floor
     uf[17] = player.weapon;
+    // TINY-OFF polish
     uf[18] = player.hurtDir;
+    // TINY-END
+    // TINY-OFF polish
     uf[19] = player.shake;
+    // TINY-END
     uf[20] = (player.keys[0] ? 1 : 0) + (player.keys[1] ? 2 : 0);
     uf[21] = exitAt[0];
     uf[22] = exitAt[1];
+    // TINY-OFF melt
     uf[23] = player.melt;
+    // TINY-END
+    // TINY-OFF polish
     uf[24] = player.switching;
+    // TINY-END
     // floats 25 to 31 are padding
 
     // Copied every frame, not once: restarting rebuilds the level in place, and
@@ -3429,12 +3749,14 @@ async function main() {
       uf[o + 2] = p.z;
       uf[o + 3] = p.kind + Math.min(Math.max(p.life, 0.01), 0.99);
     });
+    // TINY-OFF blood
     writeSlots(O_DECALS, MAX_DECALS, decals, (o, d) => {
       uf[o] = d.x;
       uf[o + 1] = d.y;
       uf[o + 2] = d.r;
       uf[o + 3] = 0;
     });
+    // TINY-END
 
     device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 
@@ -3452,10 +3774,12 @@ async function main() {
     pass.setBindGroup(0, bindGroup);
     pass.draw(3);
     pass.end();
+    // TINY-OFF melt
     if (player.melt <= 0) {
       encoder.copyTextureToTexture({ texture: view.texture }, { texture: snapshot },
                                    [canvas.width, canvas.height]);
     }
+    // TINY-END
     device.queue.submit([encoder.finish()]);
 
     requestAnimationFrame(frame);

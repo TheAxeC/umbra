@@ -1,6 +1,6 @@
 // Packs index.html into dist/umbra.zip, the artifact the project is scored on.
 //
-//   node build/pack.mjs [--tries=N]
+//   node build/pack.mjs [--tries=N] [--tiny[=name,name,...]]
 //
 // Nothing in build/ ships. The source is never minified in place: this reads
 // index.html, works entirely on strings, and writes to dist/. There is one
@@ -42,9 +42,55 @@ async function bestDeflate(data) {
 import * as esbuild from "esbuild";
 import { Packer } from "roadroller";
 import { minifyWgsl, renameWgsl, SHADER_RE } from "./wgsl-min.mjs";
+import { applyFences } from "./fences.mjs";
 
 const root = new URL("..", import.meta.url);
 const src = readFileSync(new URL("index.html", root), "utf8");
+
+// --- optional features ---------------------------------------------------------
+//
+// Regions of index.html are fenced with TINY-OFF/TINY-END markers and dropped
+// when --tiny selects them, so the entry is a documented subset of the full
+// game rather than a second copy of it. build/fences.mjs holds the pass and
+// documents the markers; the tests import it too, so every cut is compiled and
+// evaluated rather than assumed to work.
+//
+//   --tiny              drop every fenced region
+//   --tiny=minimap      drop only these, which is how a cut is measured on its
+//                       own before deciding whether to keep it
+
+// Reported rather than thrown. An uncaught error here prints a stack whose top
+// frame lands inside a minified dependency, and the one line that matters
+// scrolls off the top of it.
+function fail(message) {
+  console.error("pack: " + message);
+  process.exit(1);
+}
+
+const tinyArg = process.argv.find((a) => a === "--tiny" || a.startsWith("--tiny="));
+const tiny = Boolean(tinyArg);
+const only = tinyArg && tinyArg.includes("=")
+  ? tinyArg.slice(7).split(",").map((s) => s.trim()).filter(Boolean)
+  : null;
+
+// The full build runs the same pass with nothing selected, so marker lines are
+// stripped from both artifacts by one piece of code rather than two.
+let fenced;
+try {
+  fenced = applyFences(src, (name) => tiny && (!only || only.includes(name)));
+} catch (e) {
+  fail(e.message);
+}
+const source = fenced.text;
+
+for (const name of only || []) {
+  if (!fenced.names.has(name)) {
+    fail(`--tiny=${name}: no region is fenced under that name` +
+      `\n  fenced regions: ${[...fenced.names].sort().join(", ") || "none"}`);
+  }
+}
+const cutNames = [...fenced.names].filter((n) => tiny && (!only || only.includes(n))).sort();
+if (tiny && !cutNames.length) console.log("--tiny: no fenced regions matched, this is the full game");
 
 // --- pull the source apart ---------------------------------------------------
 
@@ -59,10 +105,10 @@ function between(text, open, close) {
   return text.slice(a + open.length, b);
 }
 
-const css = between(src, "<style>", "</style>");
-const js = between(src, '<script type="module">', "</script>");
+const css = between(source, "<style>", "</style>");
+const js = between(source, '<script type="module">', "</script>");
 // Everything from the canvas to the script tag: the four elements of the HUD.
-const body = between(src, "<canvas", '<script type="module">');
+const body = between(source, "<canvas", '<script type="module">');
 
 // --- WGSL --------------------------------------------------------------------
 
@@ -73,7 +119,7 @@ const body = between(src, "<canvas", '<script type="module">');
 // minifyWgsl lives in its own module because test/shader.html imports the same
 // function, renders the original and the minified shader, and fails unless the
 // two images match byte for byte. Any change here is checked by that test.
-const shaderMatch = src.match(SHADER_RE);
+const shaderMatch = source.match(SHADER_RE);
 if (!shaderMatch) throw new Error("could not find the shader");
 const wgsl = shaderMatch[1];
 const wgslMin = renameWgsl(minifyWgsl(wgsl));
@@ -337,25 +383,31 @@ for (const c of candidates) {
 
 const best = candidates.reduce((a, b) => (b.zip.length < a.zip.length ? b : a));
 
+// The small build writes beside the full one rather than over it, so a --tiny
+// run can never leave dist/umbra.zip holding less game than its name says.
+const tag = tiny ? "13" : "";
+
 mkdirSync(new URL("dist/", root), { recursive: true });
-writeFileSync(new URL("dist/index.html", root), best.html);
+writeFileSync(new URL(`dist/index${tag}.html`, root), best.html);
 // The unpacked build is kept because a Roadroller artifact is impossible to
 // read when something goes wrong in the browser. This one is at least greppable.
-writeFileSync(new URL("dist/index.min.html", root), plain);
-writeFileSync(new URL("dist/umbra.zip", root), best.zip);
-writeFileSync(new URL("dist/mangle-cache.json", root), JSON.stringify(mangleCache, null, 2));
+writeFileSync(new URL(`dist/index${tag}.min.html`, root), plain);
+writeFileSync(new URL(`dist/umbra${tag}.zip`, root), best.zip);
+writeFileSync(new URL(`dist/mangle-cache${tag}.json`, root), JSON.stringify(mangleCache, null, 2));
 
 const pad = (s, n) => String(s).padStart(n);
 console.log("css      " + pad(css.length, 7) + " -> " + pad(cssMin.length, 7) + " B");
 console.log("markup   " + pad(body.length, 7) + " -> " + pad(bodyMin.length, 7) + " B");
 console.log("shader   " + pad(wgsl.length, 7) + " -> " + pad(wgslMin.length, 7) + " B");
 console.log("script   " + pad(js.length, 7) + " -> " + pad(jsMin.length, 7) + " B");
-console.log("source   " + pad(src.length, 7) + " B");
+console.log("source   " + pad(src.length, 7) + " B" +
+  (tiny && source.length !== src.length ? "  -> " + pad(source.length, 7) + " B fenced" : ""));
+if (cutNames.length) console.log("dropped  " + cutNames.join(" "));
 console.log("");
 for (const c of candidates) {
   console.log(pad(c.label, 10) + "  html " + pad(c.html.length, 6) +
     " B   zip " + pad(c.zip.length, 6) + " B" + (c === best ? "   <- shipped" : ""));
 }
-console.log("\ndist/umbra.zip  " + best.zip.length + " B   " +
+console.log(`\ndist/umbra${tag}.zip  ` + best.zip.length + " B   " +
   (best.zip.length / 13312 * 100).toFixed(1) + "% of the 13 KB checkpoint   " +
   (best.zip.length / 65536 * 100).toFixed(1) + "% of the 64 KB ceiling");

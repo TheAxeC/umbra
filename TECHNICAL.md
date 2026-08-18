@@ -1,6 +1,6 @@
 # How umbra works
 
-Everything in the shipped file, in order: the world representation, the renderer, the game systems, the level generator, the synth, the interface, the test harnesses, and then the packing chain that takes 130,608 bytes of source down to a 16,948 byte zip.
+Everything in the shipped file, in order: the world representation, the renderer, the game systems, the level generator, the synth, the interface, the test harnesses, and then the packing chain, which takes 139,085 bytes of source down to a 16,930 byte zip for the full game and a 13,226 byte one for the competition entry.
 
 - [Shape of the program](#shape-of-the-program)
 - [The world as bits](#the-world-as-bits)
@@ -19,6 +19,8 @@ Everything in the shipped file, in order: the world representation, the renderer
 `index.html` is a document with an inline stylesheet, the interface markup, and one module script. The script is organised in sections, top to bottom: map storage and lookup, level generation, collision helpers, game state and settings, the interface bindings, camera and input, weapons, entities and combat, audio, the WGSL shader as a template literal, and finally the WebGPU setup and frame loop.
 
 The order matters for one reason. The test harnesses slice the file between `const MAP_SIZE` and the comment that introduces the shader, and evaluate that slice as a standalone scope. Everything above the shader is pure logic with no reference to the DOM or to WebGPU at module level, which is what makes the slice runnable under Node. Anything that touches `document` lives inside a function the tests do not call, or is guarded.
+
+One source produces two games. Regions of the file are fenced with comment markers and the packer drops the selected ones, so the full build and the smaller competition entry are the same code with a different set of regions removed rather than two files that drift apart. The markers are comments in whichever of the four languages they land in and cost nothing in either artifact. Step 0 of the packer covers the mechanism and its failure modes.
 
 The interface is HTML rather than drawn in the shader. The browser already contains a font renderer and a layout engine, and using them costs a stylesheet instead of a packed glyph table, an atlas, and the code to lay text out. It also makes the menus and sliders real controls rather than hit-tested rectangles.
 
@@ -327,35 +329,36 @@ Settings are sensitivity, field of view, volume, music and difficulty, stored in
 
 ## Testing
 
-The machine this was built on reported the browser window as hidden, which means `requestAnimationFrame` never fired and the game could not be played during development at all. The harnesses are built around that constraint.
+The machine this was built on reported the browser window as hidden for most of development, which means `requestAnimationFrame` never fired and the game could not be played at all. The harnesses are built around that constraint. It no longer holds, and both builds have since been run in Chrome, but the harnesses stay shaped that way because a check that needs someone to look at it is a check that stops being run.
 
-`test/logic.mjs` reads `index.html`, slices out the logic section and evaluates it under Node with `addEventListener`, `window` and `document` stubbed. It runs the real shipped code. 123 checks cover the five bit planes, the flow field routing around walls, stamina, the exit, the arena, cover being solid to movement and transparent to bullets, collision geometry over all 4096 cells, every weapon including ammunition and the dry-fire fallback, pickups, doors locked and unlocked, enemy pursuit, the alert memory, noise waking, casters keeping their range, fireballs hitting and being blocked, particle lifetimes and caps, difficulty scaling, the state machine, and forty generated levels.
+`test/logic.mjs` reads `index.html`, slices out the logic section and evaluates it under Node with `addEventListener`, `window` and `document` stubbed. It runs the real shipped code. 172 checks cover the five bit planes, the flow field routing around walls, stamina, the exit, the arena, cover being solid to movement and transparent to bullets, collision geometry over all 4096 cells, every weapon including ammunition and the dry-fire fallback, pickups, doors locked and unlocked, enemy pursuit, the alert memory, noise waking, casters keeping their range, fireballs hitting and being blocked, particle lifetimes and caps, difficulty scaling, the state machine, and sixty generated levels. The last forty nine belong to the fences and are described under step 0 of the packer.
 
-`test/shader.html` renders twenty one scenarios on demand rather than in a frame loop, which is what lets it work in a hidden tab, and reads the pixels back so brightness is a number. It runs the real generator to render the level the player actually spawns into, renders the packed shader beside the original and fails unless every byte of both images matches, and runs content assertions on what a frame must contain, because two equally broken shaders still match each other. It also reports a 1080p frame cost.
+`test/shader.html` renders twenty one scenarios on demand rather than in a frame loop, which is what lets it work in a hidden tab, and reads the pixels back so brightness is a number. It runs the real generator to render the level the player actually spawns into, renders the packed shader beside the original and fails unless every byte of both images matches, and runs content assertions on what a frame must contain, because two equally broken shaders still match each other. It compiles the shader of every fenced variant as well, which is the only check that a cut has not removed a WGSL function something still calls. It also reports a 1080p frame cost.
 
 `test/audio.html` injects an `OfflineAudioContext` in place of the real one and measures the samples: seventeen effects for audibility and clipping, stereo placement, distance falloff, and both sections of the song with onsets counted per bar.
 
 ## Size
 
-The zip is 16,948 bytes, and the competition limit is 13,312. It does not fit. The measurements establishing why, along with the per feature cut sheet and the plan for a compliant build, live in the README section on the 13 KB build. In brief: with every piece of presentation stubbed at once the zip is still 13,731 bytes, rewriting code denser makes the artifact bigger because the compressor charges for unique information rather than for verbose structure, and the packing pipeline measures at its optimum. A compliant entry has to contain less game.
+The full build is 16,930 bytes. The competition entry, which is the same source with fifteen fenced regions removed, is 13,226 against a limit of 13,312. Both come out of one `npm run pack`, with and without `--tiny`. The per feature cut sheet, what each row measured, and what the entry gives up to fit are in the README section on the 13 KB build; the mechanism is step 0 of the packer below.
 
 ### Where the bytes are
 
 ```
-source index.html                     130,608
-  of which WGSL                        40,331
-  of which script (includes the WGSL) 124,857
+source index.html                     139,085
+  of which WGSL                        40,325
+  of which script (includes the WGSL) 125,989
 
 after minification
   WGSL, stripped and renamed           17,594
-  script                               48,976
+  script                               48,974
   stylesheet                            2,810
-  markup                                1,636
-  whole HTML document                  53,489
+  markup                                1,637
+  whole HTML document                  53,488
 
 zipped
-  minified HTML                        19,882
-  Roadroller packed HTML (22,442)      16,948   <- shipped
+  minified HTML                        19,863
+  Roadroller packed HTML (22,418)      16,930   <- the full game
+  the same source under --tiny         13,226   <- the entry
 ```
 
 The compressor has already taken everything repetition can give. Generating the settings rows and weapon slots from a table instead of eight near identical divs saved 21 bytes, and converting the seventeen sound effects to data tables with one interpreter grew the artifact by about 200, both A/B measured. Verbose repeated structure is nearly free under context mixing; the cost is in the unique numbers and decisions, and consolidation only concentrates those.
@@ -382,6 +385,22 @@ One shader, one pass, one pipeline. Every additional pipeline costs a descriptor
 
 `build/pack.mjs` writes two candidates and ships the smaller.
 
+**0. Optional features.** The competition entry has to contain less game than the full build, and the way not to do that is to fork the source, because two versions drift. Instead regions of `index.html` are fenced with `TINY-OFF <name>` and `TINY-END` markers and the packer removes them when `--tiny` selects that name. A `TINY-ON <name>: code` line is the inverse: a comment in the full build, live code in the small one, which is how a dropped region leaves behind whatever the rest of the program still needs from it. Markers are matched as a substring of a line and the whole line is removed, so the same three markers work inside a JavaScript, WGSL, CSS or HTML comment without the packer knowing which language it is looking at. Both builds run the pass, the full one with nothing selected, so marker lines are stripped from both by one piece of code and cost nothing in either. Unbalanced fences, nested fences and unknown names stop the build rather than quietly shipping the wrong amount of game. The small build writes `dist/umbra13.zip` and `dist/index13.html`, never over the full artifact. Selecting one name at a time, `--tiny=minimap`, is how a candidate cut is measured before it is decided on.
+
+The pass itself lives in `build/fences.mjs`, dependency free and importable from a browser for the same reason `wgsl-min.mjs` is: both test harnesses import it and check every cut rather than trusting it. `test/logic.mjs` evaluates the logic block of each fenced variant and of all of them together, which catches a stub with a typo in it or a region that took a binding something else still reads. `test/shader.html` compiles each variant's shader through the packer's minifier, which catches a cut that removes a WGSL function and leaves a call to it. Compilation is the whole check there: a cut is supposed to change the image, so there is nothing to compare against.
+
+Both checks were validated by breaking a fence on purpose. Pointing the brute's stub at the function the cut removes turns the shader banner red with two of five variants broken, and leaves `test/logic.mjs` green, which is the correct division: one harness reads JavaScript and the other reads WGSL.
+
+Each variant also has to generate twelve levels with an open start and open spawns, because a cut is allowed to change the generator, and to play all sixteen sound effects against a Proxy standing in for the Web Audio API. The sound check exists because of a bug it would have caught: fencing the song took `noteHz` with it, and the pickup chime and the clear fanfare name notes too, so a music-cut build threw on the next pickup. Nothing noticed, because with no AudioContext every effect returns at its first line. The Proxy answers every property with another callable Proxy, swallows every assignment, and converts to 1 where a number is wanted, which is enough to run each effect to its end. What is under test is name resolution, not sound.
+
+What is still not covered is anything below the shader in `index.html`, because the logic block stops there, and anything that only fails at a call site the checks never reach. The chaingun cut originally crashed in `updateHud`, which is outside that range and was found by opening the build instead. A green set of harnesses is the floor for a cut, not the ceiling.
+
+The worst failure mode so far is a marker that is not a comment. `<!-- TINY-OFF polish` without its `-->` opens an HTML comment that runs to the next one, which swallowed the stamina cell: `#stam` stopped existing and `updateHud` threw on the first frame. Every harness stayed green and both artifacts in `dist/` were perfect, because the packer strips marker lines before it writes anything. Only the file you actually open in a browser was broken, and nothing opens that. `test/logic.mjs` now checks that every marker line closes whatever comment it opens. That check is narrower than the failure it stands for, so the unpacked `index.html` still wants loading in a browser after any change to the markup.
+
+A third failure mode is a fence that takes a binding the *shader* still uses. Cutting the screen shake removed `let shake = vec2f(U.shakeX, U.shakeY)`, and the crosshair subtracts that vector so it stays centred while the view moves under it. The variant would not compile, `test/shader.html` reported `unresolved value` on two of thirteen, and the crosshair line now has a stub of its own.
+
+Two more are worth naming because both cost bytes rather than correctness. A fence that strands its own dead code can make the artifact larger than leaving the feature in: cutting the rooms layout without also cutting the corridor helpers and the room size constants left them unreferenced and cost 55 bytes. And a fence that stops short of a feature's stylesheet leaves rules no element matches, which is what cutting the settings panel did until its `.row` rules joined it.
+
 **1. WGSL minification and renaming.** Comments go, whitespace collapses, and whitespace around punctuation is removed. WGSL has no string literals, so stripping line comments cannot damage anything, and whitespace is never significant outside identifiers and keywords. Removing spaces around punctuation also folds most newlines away, since almost every line ends in a brace, semicolon or parenthesis. Then identifiers are shortened: names are collected from declaration sites only, checked against WGSL's own vocabulary and against the two entry points the JavaScript names, and replaced with generated names that are verified not to occur in the source. Together this takes the shader from 26,428 bytes to 12,415.
 
 Both passes live in `build/wgsl-min.mjs` so `test/shader.html` can import the same functions, render every scenario through the original and the packed shader, and fail unless the two images match byte for byte. Renaming identifiers in a language this file does not parse would be reckless without that check; with it, the check is what makes the pass safe.
@@ -394,7 +413,7 @@ Both passes live in `build/wgsl-min.mjs` so `test/shader.html` can import the sa
 
 For the packed build the stylesheet and the markup are moved inside the script and injected at startup, which is worth about 750 bytes. Roadroller only compresses what it is given, and it is given the script; left in the document, the CSS and the elements are bytes only DEFLATE ever sees, and DEFLATE is much worse at them than context mixing is.
 
-**5. Roadroller.** DEFLATE, which is what a zip uses, is LZ77 plus Huffman with a 32 KB window and no model of what JavaScript looks like. Roadroller is a context mixing compressor: several models each predict the next character from a different length of preceding context, a logistic mixer combines them with weights that adapt as it goes, and the result is arithmetic coded. On minified JavaScript that beats DEFLATE substantially, because the next character in source code is highly predictable from the previous few. The packed document is 22,442 bytes against 53,489 for the plain minified one; after zipping the gap narrows to 16,948 against 19,882, because DEFLATE still finds a lot in ordinary minified JavaScript and almost nothing in Roadroller's output, which is close to random by construction.
+**5. Roadroller.** DEFLATE, which is what a zip uses, is LZ77 plus Huffman with a 32 KB window and no model of what JavaScript looks like. Roadroller is a context mixing compressor: several models each predict the next character from a different length of preceding context, a logistic mixer combines them with weights that adapt as it goes, and the result is arithmetic coded. On minified JavaScript that beats DEFLATE substantially, because the next character in source code is highly predictable from the previous few. The packed document is 22,418 bytes against 53,488 for the plain minified one; after zipping the gap narrows to 16,930 against 19,863, because DEFLATE still finds a lot in ordinary minified JavaScript and almost nothing in Roadroller's output, which is close to random by construction.
 
 Its optimizer searches at random and lands a few bytes apart on each run, so the packer takes the best of three passes.
 
@@ -404,9 +423,21 @@ Roadroller's output is not ASCII, so that variant declares `charset=utf-8`; with
 
 ### Tried, measured, and closed
 
+Parameterising the three enemy sprites. The imp, the caster and the brute are the same parts in the same order, so the assembly was rewritten once as a shared evaluator and the three enemies became three tables of numbers passed to it in a struct. Byte for byte it is worse: the shader grew, the minified document grew by 465 bytes and the zip by 188. This is the second measurement of the same effect, after the sound effects, and the reason is the same both times. Roadroller charges for unique information and almost nothing for repeated structure, so writing the structure once removes what was already free while the constants, which are what actually cost, survive the move into the table intact. Worse, a positional constructor has to spell out every field the enemy does not use, and a hand written function simply omits those parts. Consolidation is not a size technique in this file, in either direction, and the two measurements should be enough to stop a third attempt.
+
 Explicit Roadroller model configurations lose to its automatic search. Its memory budget swept from 150 MB to 900 MB moves the artifact by less than its own run to run noise. Keeping identifier names instead of mangling, on the theory that a context mixer prefers consistent long names, loses by two kilobytes. Rounding numeric literals saves nothing until it is coarse enough to change gameplay. Consolidating repeated code into data tables grows the artifact. What remains is the game itself.
 
 ## Non-obvious failures
+
+### The cave generator could hang the tab
+
+Picking spawn spots in a cave ran a loop that only exited on its twelfth successful placement, where a placement succeeded if it landed more than nine cells from every spot already down. A cave large enough to pass the 420 cell survival threshold is not necessarily large enough to hold twelve points that far apart, and when it is not, the twelfth success never arrives and the loop never returns. Seed 1382 was still spinning after forty million iterations.
+
+Those seeds are reachable: levels take `BASE_SEED + level`, odd levels get even seeds, and even seeds go to the cave generator. Levels 45 and 49 hung. Four of the first 120 seeds hung. It never showed up because the generator tests stopped at level 40 and because nobody had played that far.
+
+The loop is now bounded by attempts rather than by successes, and a cave that cannot hold twelve spread out spots gets as many as it can hold. Healthy seeds reach twelve in 29 attempts at the median and 140 at the ninetieth percentile, so a ceiling of 400 leaves every level that already worked exactly as it was. The generator checks in `test/logic.mjs` now run to level 60 instead of 40, which covers both of the seeds that used to hang: if the unbounded form ever comes back, `npm test` stops returning, which is blunt but not quiet.
+
+The general shape of the bug is worth keeping in mind for anything else in the generator: a retry loop whose exit condition is a success count, over a search space that can be empty.
 
 Bugs from the build that were not visible by reading the code. They are recorded because the same mistakes are easy to repeat.
 
@@ -448,6 +479,6 @@ Enemy pathing is one flow field aimed at the player. Enemies cannot route toward
 
 Levels are assembled rather than designed. Rooms and caves both produce plausible spaces, but beyond the one arena per level nothing shapes them into encounters, so difficulty still comes mostly from counts.
 
-The byte budget is not the reason for any of this. At 16,948 bytes there is room for roughly three times the current content before the 64 KB ceiling.
+The byte budget is not the reason for any of this. At 16,930 bytes there is room for roughly three times the current content before the 64 KB ceiling.
 
 The largest remaining gap is that none of it has been played. Every number in the tuning, from fire rates to enemy speed to how far a growl carries, was chosen by reasoning and verified only for correctness, never for feel.

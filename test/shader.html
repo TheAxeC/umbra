@@ -32,6 +32,7 @@
 // which is loud enough to notice but worth stating: if the shader gains a
 // field, the offsets here need updating too.
 import { minifyWgsl, renameWgsl } from "../build/wgsl-min.mjs";
+import { applyFences, fenceNames } from "../build/fences.mjs";
 const src = await (await fetch("../index.html")).text();
 const m = src.match(/const SHADER = `([\s\S]*?)`;/);
 if (!m) throw new Error("could not extract SHADER");
@@ -431,6 +432,48 @@ console.log("scenarios drawn: " + scenarios.length);
   const ms = (performance.now() - t0) / N;
   console.log("1080p frame cost approx " + ms.toFixed(2) + " ms (" + (1000 / ms).toFixed(0) + " fps)");
 }
+
+// --- the fenced variants -----------------------------------------------------
+//
+// The competition build drops fenced regions from this same source, and a cut
+// that removes a WGSL function while leaving a call to it produces a shader
+// that fails to compile. Nothing else notices: everything above renders the
+// full shader, and the packer does not parse WGSL. So compile the shader of
+// every cut, one region at a time and then all of them together.
+//
+// Compilation is the whole check. A cut is meant to change the image, so there
+// is nothing to compare against; what matters is that the shader the entry
+// ships is a shader at all. Each variant goes through the packer's minifier
+// first, because that is the form that ships.
+{
+  const names = fenceNames(src);
+  // Measured against the source with every marker line already stripped and
+  // nothing selected, not against the raw file. Stripping the markers alone
+  // takes a few hundred bytes out of the WGSL, and charging that to whichever
+  // region happened to be selected would credit a JavaScript-only cut such as
+  // music with shrinking the shader.
+  const base = applyFences(src, () => false).text.match(/const SHADER = `([\s\S]*?)`;/)[1].length;
+  let bad = 0;
+  for (const pick of [...names.map((n) => [n]), names]) {
+    const label = pick.length === 1 ? pick[0] : "all " + pick.length + " together";
+    const cut = applyFences(src, (n) => pick.includes(n)).text;
+    const hit = cut.match(/const SHADER = `([\s\S]*?)`;/);
+    if (!hit) { console.log("FAIL --tiny=" + label + ": no shader in the fenced source"); bad++; continue; }
+    const variant = renameWgsl(minifyWgsl(hit[1]));
+    const mod = device.createShaderModule({ code: variant });
+    const errs = (await mod.getCompilationInfo()).messages.filter((e) => e.type === "error");
+    for (const e of errs) console.log("  line " + e.lineNum + ": " + e.message);
+    console.log((errs.length ? "FAIL " : "ok   ") + "--tiny=" + label +
+      " compiles (" + variant.length + " B, " + (base - hit[1].length) + " B of WGSL cut)");
+    if (errs.length) bad++;
+  }
+  const banner = document.createElement("div");
+  banner.textContent = (bad ? "FAIL" : "PASS") + " fenced shader variants compile: " +
+    (names.length + 1) + " checked, " + bad + " broken";
+  banner.style.cssText = "color:" + (bad ? "#e55" : "#7c7") + ";font:14px monospace;padding:8px";
+  document.body.prepend(banner);
+}
+
 </script>
 </body>
 </html>
