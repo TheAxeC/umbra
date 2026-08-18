@@ -14,10 +14,9 @@
 // so the same three work inside a JavaScript, WGSL, CSS or HTML comment without
 // this file knowing which language it is looking at.
 //
-// Regions nest, because cuts overlap in practice: the music slider is a row in
-// the settings panel, so it has to disappear when either name is selected. A
-// line is dropped if any region enclosing it is selected, which is the reading
-// that makes the nested case come out right in all four combinations.
+// Regions nest, because cuts overlap. The music slider is a row in the settings
+// panel and has to go when either name is selected, so a line is dropped if any
+// region around it is selected.
 //
 // build/pack.mjs uses this to build dist/umbra13.zip. test/logic.mjs and
 // test/shader.html import the same function so that every fenced variant is

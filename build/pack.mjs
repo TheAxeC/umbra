@@ -218,10 +218,9 @@ function shell(script, charset) {
 // The packed variant carries nothing but the script, which puts the stylesheet
 // and the elements back itself.
 //
-// The body tag is not optional here even though HTML says it is. Without it the
-// script runs while document.body is still null, because the parser only
-// creates the body once it reaches content; the game then fails on the first
-// getElementById. Six bytes to have somewhere to put the markup.
+// The body tag has to be here even though HTML says it is optional. Without it
+// the parser has not created a body by the time the script runs, document.body
+// is null and the first getElementById fails.
 function bareShell(script) {
   return "<!doctype html><meta charset=\"utf-8\"><title>umbra</title><body><script>" +
     script + "</script>";
@@ -355,9 +354,8 @@ async function makeZip(name, contents) {
   return Buffer.concat([local, nameBuf, body, central, nameBuf, end]);
 }
 
-// The zip is the deliverable, and a malformed one is worse than a large one
-// because it fails at whoever opens it rather than here. Read it back through
-// its own headers, inflate it, and compare against what went in.
+// Read the archive back through its own headers, inflate it, and compare
+// against what went in. A malformed zip fails at whoever opens it, not here.
 function verifyZip(zip, expected) {
   if (zip.readUInt32LE(0) !== 0x04034b50) throw new Error("zip: bad local header");
   const nameLen = zip.readUInt16LE(26);

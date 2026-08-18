@@ -24,13 +24,11 @@
 //      a mapped buffer, so brightness comes out as a number rather than an
 //      impression. Judging it from a screenshot does not work: the surrounding
 //      page affects the perception, and JPEG compression alters the values.
-//   3. Compares the minified shader against the original, pixel for pixel. That
-//      is what makes the WGSL minifier in the packer safe to touch.
+//   3. Compares the minified shader against the original, pixel for pixel.
 //
 // The uniform buffer is built by hand here, so the layout below has to match
-// the one in index.html. A mismatch shows up as scenarios rendering as garbage,
-// which is loud enough to notice but worth stating: if the shader gains a
-// field, the offsets here need updating too.
+// index.html. Add a field to the shader and the offsets here need updating too,
+// otherwise every scenario renders as garbage.
 import { minifyWgsl, renameWgsl } from "../build/wgsl-min.mjs";
 import { applyFences, fenceNames } from "../build/fences.mjs";
 const src = await (await fetch("../index.html")).text();

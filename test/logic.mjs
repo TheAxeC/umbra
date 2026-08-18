@@ -3,16 +3,13 @@
 //   node test/logic.mjs        (or npm test)
 //
 // The game is one HTML file with an inline module script, so there is nothing
-// to import. Rather than duplicate the logic here, which would rot within a
-// day, this reads index.html, cuts out the section of the script that contains
-// the game logic, and evaluates it. The checks below run the code that ships.
+// to import. This reads index.html, cuts out the game logic and evaluates it.
 //
-// The cut runs from the first map constant to the comment that introduces the
-// shader. Everything in that range is kept free of DOM and WebGPU
-// references at module level, which is what makes it evaluable under Node; the
-// setup and frame loop below the shader are not included and are not tested
-// here. Both markers are ordinary source text, so if someone reorganises
-// index.html this throws rather than silently testing half a file.
+// The cut runs from the first map constant to the comment above the shader.
+// Nothing in that range may touch the DOM or WebGPU at module level. The setup
+// and frame loop below the shader are not covered. Both markers are ordinary
+// source text, so a reorganised index.html throws here instead of testing half
+// a file.
 import { readFileSync } from "node:fs";
 import { applyFences, fenceNames } from "../build/fences.mjs";
 
@@ -23,26 +20,23 @@ if (start < 0 || end < 0 || end < start) throw new Error("could not locate the l
 const block = src.slice(start, end);
 
 // The globals the block touches while it evaluates. It registers keyboard
-// listeners at top level, which is all addEventListener and document are for.
+// listeners at top level, hence addEventListener and document.
 //
-// window is present but empty, which is not a hack to get the file to run: it
-// is the shape of a browser with no WebAudio. initAudio reads
-// window.AudioContext, finds nothing, and returns without building a graph, and
-// the audio checks near the bottom of this file assert that every sound is then
-// a silent no-op rather than a crash. Gameplay calls those functions on every
-// shot and every footstep, so that path has to hold.
+// window is empty on purpose. That is a browser with no WebAudio: initAudio
+// looks for window.AudioContext, finds nothing and returns without building a
+// graph. The audio checks at the bottom assert every sound is then a no-op.
+// Gameplay calls those on every shot and every footstep.
 //
-// localStorage is absent for the same reason: settings must survive a browser
-// that refuses to store them.
+// localStorage is absent for the same reason. Settings have to survive a
+// browser that will not store them.
 globalThis.addEventListener = () => {};
 globalThis.window = {};
 globalThis.document = { addEventListener: () => {} };
 
-// new Function gives the block its own scope, and the appended return statement
-// is the only way to reach inside it. Everything the checks touch has to be
-// named here, which is verbose but keeps the game itself free of test hooks:
-// index.html exports nothing and knows nothing about being tested. The getters
-// read bindings that are reassigned at runtime, so they have to be closures
+// new Function gives the block its own scope, so the appended return statement
+// is how the checks reach inside. Everything they touch is named here. It is
+// verbose, but index.html exports nothing and has no test hooks in it. The
+// getters read bindings that get reassigned at runtime, so they are closures
 // rather than values captured once.
 const scope = new Function(block + `
 return {
@@ -339,8 +333,8 @@ for (let i = 0; i < 60; i++) updateFoes(1 / 60);
 check("an imp with no sight and no memory holds still",
       blind.x === blindAt[0] && blind.y === blindAt[1]);
 
-// The memory is the point of the rewrite: breaking line of sight used to stop
-// an enemy dead, which made every fight winnable by stepping behind a corner.
+// Without the alert memory, breaking line of sight stops an enemy dead and
+// every fight is winnable by stepping behind a corner.
 arena([[24.5, 9.5, "imp"]]);
 camera.x = 18.5; camera.y = 9.5;
 const hunter = getFoes()[0];
@@ -520,12 +514,9 @@ check("a shallower one is not", getBest() === wasBest + 3);
 
 console.log("level generation");
 let minSpots = 99, worstOpen = 1, bestOpen = 0, unreachable = 0, caves = 0, rooms = 0, shortExit = 0;
-// Through level 60 rather than 40, because levels 45 and 49 used to hang. The
-// cave generator picked spawn spots with a loop that only exited on its twelfth
-// successful placement, and a cave too tight to hold twelve points nine cells
-// apart never produced a twelfth: seed 1382 spun past forty million iterations.
-// If that ever comes back this loop stops returning, which is a blunt failure
-// but not a quiet one.
+// Runs to 60 because the cave spawn-spot loop can fail to terminate on a tight
+// cave, and levels 45 and 49 are the first seeds that hit it. If that comes
+// back, this loop stops returning.
 for (let seed = 1; seed <= 60; seed++) {
   setLevel(seed);
   buildLevel(BASE_SEED + seed);
@@ -653,12 +644,9 @@ check("the swing is a nudge, not a lurch", SWING > 0 && SWING < 0.34, "swing=" +
 // block of every cut, one region at a time and then all of them together, and
 // demand it evaluates.
 //
-// What this catches: a stub with a typo in it, a region that took a binding
-// something else still reads, and a fence left unbalanced. What it does not
-// catch: a mistake that only shows at a call site these checks never reach, and
-// anything below the shader, which is not in the block. The chaingun cut
-// originally crashed in updateHud, which is outside this range, so treat a pass
-// here as the floor rather than the ceiling.
+// Catches a stub with a typo, a region that took a binding something else
+// reads, and an unbalanced fence. Does not catch anything below the shader, or
+// a mistake that only shows at a call site these checks never reach.
 // Every marker line has to be a well formed comment where it sits, or it is
 // not inert in the unpacked source. The packer strips marker lines before it
 // writes anything, so a marker that opens a comment and never closes it leaves

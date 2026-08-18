@@ -181,9 +181,8 @@ const SOLID = new Uint32Array(MAP_WORDS);
 const LOW = new Uint32Array(MAP_WORDS);
 const DOORBIT = new Uint32Array(MAP_WORDS);
 
-// Floor height, two bits per cell across two planes, giving four levels a
-// quarter of a wall apart. This is what makes stairs and raised areas possible:
-// a cell is not just open or shut, it is open at a height.
+// Floor height, two bits per cell across two planes, four levels a quarter of
+// a wall apart. A cell is open at a height rather than simply open or shut.
 const HGT0 = new Uint32Array(MAP_WORDS);
 const HGT1 = new Uint32Array(MAP_WORDS);
 // TINY-OFF elevation
@@ -222,8 +221,7 @@ function solidAt(cx, cy) {
   return bitAt(SOLID, cx, cy);
 }
 
-// Blocks sight and bullets. Waist high blocks are transparent to
-// both, which is the whole point of them.
+// Blocks sight and bullets. Waist high blocks are transparent to both.
 function opaqueAt(cx, cy) {
   if (cx < 0 || cy < 0 || cx >= MAP_SIZE || cy >= MAP_SIZE) return true;
   return bitAt(SOLID, cx, cy) && !bitAt(LOW, cx, cy);
@@ -316,7 +314,7 @@ function carveRooms() {
     }
   };
   for (let i = 1; i < rooms.length; i++) link(rooms[i - 1], rooms[i]);
-  // Extra links turn the layout from a tree into a graph, which means loops,
+  // Extra links turn the layout from a tree into a graph, giving loops,
   // alternative routes, and being approached from two directions at once.
   for (let i = 0; i < 3; i++) link(rooms[randInt(rooms.length)], rooms[randInt(rooms.length)]);
 
@@ -446,7 +444,7 @@ function chokepoints() {
 // Cover: short runs of waist high blocks in open floor, so there is something
 // to break sight lines and duck behind.
 //
-// Placement is verified rather than guessed. Counting solid neighbours is not
+// Placement is verified, not guessed. Counting solid neighbours is not
 // enough: a run of three can bridge a corridor from a cell that looked open,
 // which seals off part of the level and can strand an enemy or a key where the
 // player can never reach it. So each run is placed, the level is flood filled,
@@ -592,9 +590,8 @@ function generate(seed) {
   DOORBIT.fill(0);
   return carveRooms();
   // TINY-END
-  // With no second layout to fall back on, clear the collapsed cave away and
-  // hand back one plain room. Deterministic, always connected, and unlike a
-  // retry it cannot fail twice.
+  // No second layout to fall back on, so clear the collapsed cave away and
+  // hand back one plain room. Deterministic and always connected.
   // TINY-ON rooms:   SOLID.fill(0xffffffff); LOW.fill(0); DOORBIT.fill(0);
   // TINY-ON rooms:   for (let y = 20; y < 44; y++) { for (let x = 20; x < 44; x++) { carve(x, y); } }
   // TINY-ON rooms:   return [{ x: 32.5, y: 32.5 }];
@@ -608,7 +605,7 @@ const EPS = 1e-4;
 
 // Where the body comes to rest when a step is refused: flush against the cell
 // boundary it was heading for, rather than dropping the step and leaving a gap.
-// Safe because a single step is always shorter than a cell.
+// A single step is shorter than a cell, so this cannot overshoot.
 function axisStop(pos, delta) {
   return delta > 0 ? Math.floor(pos + RADIUS) + 1 - RADIUS - EPS
                    : Math.floor(pos - RADIUS) + RADIUS + EPS;
@@ -1141,9 +1138,9 @@ const AMMO_NAME = ["BULLETS", "SHELLS"];
 // Entities: enemies, pickups, doors, projectiles and particles.
 //
 // Every array here has a matching fixed size array in the uniform buffer, so
-// the caps are the shader's caps. Anything over the cap simply is not drawn,
-// which for particles is invisible and for the rest cannot happen because the
-// generator places fewer than the cap.
+// the caps are the shader's caps. Anything past the cap is not drawn. For
+// particles that goes unnoticed, and the generator places fewer than the cap of
+// everything else.
 // ---------------------------------------------------------------------------
 
 const MAX_FOES = 14;
@@ -1154,8 +1151,8 @@ const MAX_PARTS = 40;
 const FOE_R = 0.34;         // must match FOE_R in the shader
 const SHOT_R = 0.16;
 
-// Two enemies. The imp closes and swings; the caster keeps its distance and
-// throws fireballs, which is what makes cover and positioning matter.
+// The imp closes and swings. The caster keeps its distance and throws
+// fireballs, so cover and positioning matter.
 const FOE_KIND = {
   imp:    { hp: 60,  speed: 1.8, reach: 0.95, swing: 1.05, damage: 9,  sight: 15, ranged: 0 },
   caster: { hp: 45,  speed: 1.2, reach: 7.0,  swing: 1.9,  damage: 12, sight: 17, ranged: 1 },
@@ -1623,8 +1620,8 @@ function updateHud() {
   // TINY-END
   hud.keyRed.classList.toggle("have", player.keys[0]);
   hud.keyBlue.classList.toggle("have", player.keys[1]);
-  // Driven off the table rather than a literal 3, because the slot elements are
-  // built from that table too and the two silently disagreeing is a crash.
+  // Off the table, not a literal 3: the slot elements come from the same table
+  // and a mismatch crashes here.
   for (let i = 0; i < WEAPONS.length; i++) {
     hud.slots[i].classList.toggle("dim", !player.have[i]);
     hud.slots[i].classList.toggle("on", player.weapon === i);
@@ -1806,9 +1803,8 @@ function updateFoes(dt) {
       }
     }
 
-    // With nothing seen and nothing remembered, hold position. With a memory,
-    // walk to where the player was last known to be, which is what stops an
-    // enemy from freezing the instant you step behind a wall.
+    // Nothing seen and nothing remembered, hold position. With a memory, walk
+    // to the last known position, so stepping behind a wall does not freeze it.
     if (!seen) {
       if (f.alert <= 0) continue;
       if (Math.hypot(f.tx - f.x, f.ty - f.y) < 0.6) { f.alert = 0; continue; }
@@ -1969,7 +1965,7 @@ const MUSIC_GAIN = 0.26;
 // Two sections. A is the bed the level runs on; B brings in the arpeggio and
 // the snare and moves the bass around, so a sixteen bar loop does not wear
 // through the way a four bar one does. Offsets stay inside a minor pentatonic
-// (0, 3, 5, 7, 10) which is why none of this needs a chord table.
+// (0, 3, 5, 7, 10), so there is no chord table.
 const BASS_A = "0.0.0.0.3.0.5.03";
 const BASS_B = "0.0.5.0.7.0.5.03";
 const ARP = "0.3.7.a.7.3.5.3.";
@@ -1980,8 +1976,8 @@ const HAT = "..x...x...x...xx";
 const PROG_A = [0, 0, 5, 3, 0, 0, 7, 5];  // bar to bar transposition
 const PROG_B = [5, 5, 3, 3, 0, 0, 7, 7];
 const BARS = 16;
-// Sixteenths are nudged off the grid in alternation, which is the difference
-// between a drum machine and something with a pulse.
+// Every other sixteenth lands a little late. Without it the loop sits dead on
+// the grid.
 const SWING = 0.12;
 // TINY-END
 
@@ -2220,8 +2216,8 @@ function sfxImpDie(x, y, kind) {
   tone("sine", 55, t + (kind === 2 ? 0.55 : 0.35), 0.5, 0.002, 0.2, out);
 }
 
-// Two bandpasses over a sawtooth make a rough vowel, which is what turns a
-// buzz into a voice. Each enemy gets its own register so you can tell what is
+// Two bandpasses over a sawtooth make a rough vowel, turning a buzz into a
+// voice. Each enemy gets its own register so you can tell what is
 // in the room with you without looking: the imp snarls, the caster hisses
 // upward, and the brute is a low roar you feel before you see it.
 function growlVoice(t, x, y, base, glide, len, formant, level) {
@@ -2268,8 +2264,8 @@ function sfxSwing(x, y) {
 }
 // TINY-END
 
-// A caster winding up. Deliberately distinct from anything else in the mix,
-// because it is the cue to break line of sight.
+// A caster winding up. Distinct from anything else in the mix, since it is the
+// cue to break line of sight.
 function sfxCast(x, y) {
   if (!audio) return;
   const t = audio.ctx.currentTime;
@@ -2388,8 +2384,8 @@ function leadVoice(t, freq, level, decay) {
 }
 
 // A slow pad under everything, three detuned saws through a filter that opens
-// across the bar. It is what stops the loop sounding like four instruments
-// playing in an empty room.
+// across the bar. Without it the loop sounds like four instruments in an empty
+// room.
 function padVoice(t, freq, len) {
   const lp = audio.ctx.createBiquadFilter();
   lp.type = "lowpass";
@@ -2423,8 +2419,8 @@ function playStep(i, at) {
   // The pad holds the root under each bar.
   if (s === 0) padVoice(at, noteHz(key + 12), beat * 15);
 
-  // The arpeggio and the melody over it only run in the second section, which
-  // is what gives the loop somewhere to go.
+  // Arpeggio and melody run in the second section only, so the loop has
+  // somewhere to go.
   const a = parseInt(ARP[s], 36);
   if (a === a && sectionB) leadVoice(t, noteHz(key + a + 24), 0.075, 0.2);
   const l = parseInt(LEAD[s], 36);
@@ -2648,9 +2644,8 @@ fn doorTex(p : vec2f, key : f32) -> vec3f {
   return tint * band * (0.75 + 0.4 * grain) * (0.7 + 0.3 * edge);
 }
 
-// Waist high cover: crates. Deliberately not wall coloured, because the whole
-// point of it is that you can tell at a glance it is something to duck behind
-// and shoot over rather than a piece of wall.
+// Waist high cover: crates. Not wall coloured, so it reads at a glance as
+// something to duck behind and shoot over.
 fn crateTex(cell : vec2i, p : vec2f) -> vec3f {
   let grain = fbm(p * vec2f(9.0, 14.0));
   var base = mix(vec3f(0.34, 0.24, 0.13), vec3f(0.46, 0.34, 0.19), grain);
@@ -2701,10 +2696,10 @@ fn groundTex(p : vec2f, up : bool) -> vec3f {
 // The three enemies, drawn in billboard space: u spans -1..1 across the
 // sprite, v runs 0 at the feet to 1 over the head. Returns rgb plus coverage.
 //
-// All three are built the same way and it is worth stating once. A silhouette
-// is what reads at range, so each has a distinct outline and palette. Shading
-// runs along u, which fakes a cylinder and is what stops them looking like
-// stickers. A dark rim on the outer edge separates them from the wall behind.
+// All three are built the same way. Silhouette is what reads at range, so
+// each has a distinct outline and palette. Shading runs along u, faking a
+// cylinder so they do not look like stickers. A dark rim on the outer edge
+// separates them from the wall behind.
 // gait swings between -1 and 1 while walking and sits at 0 when still; idle is
 // a slow sway that keeps a stationary enemy from looking like scenery.
 
@@ -3102,9 +3097,8 @@ fn fs(@builtin(position) frag : vec4f) -> @location(0) vec4f {
   // TINY-END
   // TINY-ON polish:   let ndc = frag.xy / U.res * 2.0 - 1.0;
   let screenX = ndc.x * aspect * U.fov;
-  // Pitch is a shear, not a rotation: it slides the horizon instead of
-  // tilting the camera, which is what keeps the columns vertical. The walk
-  // cycle rides on the same value.
+  // Pitch is a shear, not a rotation: it slides the horizon instead of tilting
+  // the camera, so the columns stay vertical. The walk cycle rides on it too.
   let bobY = sin(U.bob) * 0.012;
   let bobX = cos(U.bob * 0.5) * 0.010;
   // The wipe. Doom slid the outgoing screen downwards in ragged columns and
@@ -3142,7 +3136,7 @@ fn fs(@builtin(position) frag : vec4f) -> @location(0) vec4f {
   // The ray walks the grid cell by cell, and at each one it asks two questions:
   // is the floor of this cell visible at this pixel, and does the next cell put
   // something vertical in the way. Floors are per cell because the world has
-  // height: a cell is not simply open or shut, it is open at an elevation, and
+  // height: a cell is open at an elevation rather than just open or shut, and
   // the step between two elevations is a face the ray can hit.
   var cell = vec2i(floor(U.cam));
   let delta = abs(1.0 / rd);
@@ -3310,8 +3304,8 @@ fn fs(@builtin(position) frag : vec4f) -> @location(0) vec4f {
 
   let halfHeight = WALL_HEIGHT / dist;
 
-  // The muzzle flash is the one dynamic light in the game: a brief burst at the
-  // camera, falling off with distance, which is why firing lights up a corridor.
+  // The one dynamic light in the game: a brief burst at the camera, falling
+  // off with distance, so firing lights up a corridor.
   color = color * (1.0 + U.flash * 2.2 * exp(-dist * 0.45));
 
   // --- enemies -------------------------------------------------------------

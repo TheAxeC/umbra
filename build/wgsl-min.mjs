@@ -1,26 +1,19 @@
 // WGSL minifier, shared between the packer and the shader test.
 //
-// build/pack.mjs uses it to shrink the shader before shipping. test/shader.html
-// imports the same function, renders every scenario through the original and
-// the minified shader, and fails unless the two images are identical byte for
-// byte. That test is the reason this can be edited with any confidence, so keep
-// this module dependency free and importable from a browser.
+// build/pack.mjs shrinks the shader with it before shipping. test/shader.html
+// imports the same function and renders every scenario through both versions,
+// failing unless the images match byte for byte. Keep this module dependency
+// free so the browser can import it.
 //
-// It halves the shader, 11,924 bytes down to 5,939, which is mostly comments
-// and indentation. It does not rename identifiers. Renaming would save perhaps
-// another 200 bytes before packing and considerably less after, since Roadroller
-// already models repeated identifiers well.
+// Roughly halves the shader, mostly comments and indentation.
 
-// Two properties of WGSL make this safe, and both are worth stating because
-// neither holds for JavaScript:
+// Two things about WGSL make this safe, neither of which holds for JavaScript:
 //
-//   1. There are no string literals in the language, so a // sequence is always
-//      the start of a comment and can never appear inside data.
-//   2. Whitespace is only significant where it separates two identifiers or
-//      keywords, never around punctuation.
+//   1. No string literals, so a // sequence is always a comment.
+//   2. Whitespace only matters between two identifiers or keywords.
 //
-// Anything relying on those two facts is fine. Anything cleverer, such as
-// dropping the space in "let x", is not, and is not attempted here.
+// Anything past those two, like dropping the space in "let x", is not attempted
+// here.
 export function minifyWgsl(code) {
   return code
     // Line comments. There are no block comments in this shader; if any are
@@ -33,7 +26,7 @@ export function minifyWgsl(code) {
     .replace(/\n+/g, "\n")
     // Whitespace around punctuation. This also removes most of the remaining
     // newlines as a side effect, because nearly every line of WGSL ends in a
-    // brace, a semicolon or a parenthesis. Note that "->" survives as "->" and
+    // brace, a semicolon or a parenthesis. "->" survives as "->" and
     // ">>" as ">>", since only the surrounding whitespace is touched.
     .replace(/\s*([{}()<>,;:=+\-*/%&|!?[\]])\s*/g, "$1")
     .trim();

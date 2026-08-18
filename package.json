@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "A Doom-shaped FPS in WebGPU that ships as one zipped index.html",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=18"

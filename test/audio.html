@@ -15,19 +15,14 @@
 //
 // Serve the repository and open http://localhost:8000/test/audio.html
 //
-// Audio is the easiest part of a game to ship broken, because nothing throws
-// when a sound is inaudible. The footstep in this game shipped at a peak of
-// 0.007, which is silence, and the code looked entirely reasonable: a noise
-// burst through a lowpass at a sensible gain. A 480 Hz lowpass simply discards
-// almost all the energy in white noise. Only rendering it and looking at the
-// numbers found that.
+// Nothing throws when a sound comes out inaudible, so these render the audio
+// and measure it. A noise burst through a 480 Hz lowpass looks fine in code and
+// arrives at a peak of 0.007, which is silence.
 //
-// OfflineAudioContext renders faster than real time into a buffer, needs no
-// speakers, and needs no user gesture, which also makes this work in a
-// backgrounded tab. The trick that makes it possible to test the game's own
-// audio code is in render() below: window.AudioContext is temporarily replaced
-// with a constructor that hands back the offline context, so initAudio builds
-// its graph there without knowing the difference.
+// OfflineAudioContext renders faster than real time into a buffer and needs no
+// speakers or user gesture. render() below swaps window.AudioContext for a
+// constructor handing back the offline context, so initAudio builds its graph
+// there without knowing.
 const src = await (await fetch("../index.html")).text();
 const block = src.slice(src.indexOf("const MAP_SIZE"), src.indexOf("// Shader. Fullscreen triangle"));
 const EXPORTS = `
